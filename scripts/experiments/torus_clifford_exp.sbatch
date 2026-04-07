@@ -3,7 +3,12 @@
 # Uses the Clifford embedding (R^4) which is genuinely flat (K=0 everywhere).
 # The flat geodesic formula d=sqrt((R*dtheta)^2+(r*dphi)^2) is EXACT here.
 # Previous experiments used the standard R^3 torus (nonzero varying curvature).
-# Expected: curvature proxy kappa_hat -> 0, validating the negative test.
+#
+# Expected curvature proxy (reconstruction regime, Proposition 4):
+#   kappa_hat* = sqrt(1/R^2 + 1/r^2) * sqrt(4/G) = sqrt(5/50) ~ 0.316
+# Note: kappa_hat -> 0 is NOT achievable even for a flat torus because the
+# Clifford embedding has nonzero second fundamental form h (extrinsic curvature).
+# Values near 0.316 indicate a well-calibrated decoder.
 #SBATCH -o /home/icb/mostafa.shahhosseini/code/repos/rieVAE/slurm_torus_clifford_%j.job
 #SBATCH -e /home/icb/mostafa.shahhosseini/code/repos/rieVAE/slurm_torus_clifford_err_%j.job
 #SBATCH --job-name=rieVAE-torus-clifford
