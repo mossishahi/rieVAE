@@ -283,9 +283,29 @@ def main() -> None:
     print(f"    Isometry (Riemannian pullback):  MAE={iso_baseline_riem['mae']:.4f}  "
           f"Corr={iso_baseline_riem['corr']:.4f}  Spearman={iso_baseline_riem.get('spearman', float('nan')):.4f}")
     kappa_theory = (2.0 / args.radius) * (3.0 / args.ambient_dim) ** 0.5
+    # Minimum baseline calibration check:
+    # kappa_hat inflation (baseline >> SCR-VAE) requires the baseline decoder
+    # to be well-trained so that Euclidean-KNN non-geodesic edges produce
+    # meaningful closure vectors. If baseline_kappa < 3 * kappa_theory, the
+    # decoder is undertrained and the kappa comparison is unreliable.
+    # Rule of thumb: need n_baseline_epochs >= 30 * n_points.
+    kappa_min_valid = 3.0 * kappa_theory  # empirical threshold
+    kappa_baseline_ok = curv_baseline['mean_kappa'] >= kappa_min_valid
+    epochs_min_rule = 30 * args.n_points
+    baseline_epochs_ok = args.n_baseline_epochs >= epochs_min_rule
     print(f"    Mean kappa_hat:    {curv_baseline['mean_kappa']:.4f}")
     print(f"    Theory (recon-regime): {kappa_theory:.4f}  [= (2/R)*sqrt(3/G)]")
     print(f"    Sectional K = 1/R^2:   {curv_baseline['true_K']:.4f}")
+    if not kappa_baseline_ok or not baseline_epochs_ok:
+        print(f"\n  [WARNING] UNDERTRAINED BASELINE -- kappa comparison unreliable.")
+        print(f"    baseline kappa={curv_baseline['mean_kappa']:.4f} < threshold={kappa_min_valid:.4f}"
+              f"  (need >= 3x theory)")
+        print(f"    baseline epochs={args.n_baseline_epochs} < recommended={epochs_min_rule}"
+              f"  (need >= 30 * n_points)")
+        print(f"    Isometry MAE comparison is still valid; kappa direction is NOT.")
+        results["kappa_comparison_valid"] = False
+    else:
+        results["kappa_comparison_valid"] = True
 
     results["baseline"] = {
         "isometry_euclidean": iso_baseline_euclid,
@@ -389,10 +409,12 @@ def main() -> None:
     print(f"  {'Riemannian pullback Spearman':<30} "
           f"{iso_baseline_riem.get('spearman', float('nan')):>12.4f} "
           f"{iso_scrvae_riem.get('spearman', float('nan')):>12.4f}")
+    kappa_note = "" if results.get("kappa_comparison_valid", True) else "  [UNDERTRAINED -- see warning above]"
     print(f"  {'Curvature proxy kappa_hat':<30} "
           f"{curv_baseline['mean_kappa']:>12.4f} "
           f"{curv_scrvae['mean_kappa']:>12.4f}  "
-          f"(theory={kappa_theory:.4f}, K={1.0/args.radius**2:.4f})")
+          f"(theory={kappa_theory:.4f}, K={1.0/args.radius**2:.4f})"
+          f"{kappa_note}")
 
     out_path = os.path.join(args.out_dir, "results.json")
     with open(out_path, "w") as f:
