@@ -147,7 +147,17 @@ def evaluate_curvature_torus(
     edge_index: torch.Tensor,
     max_triangles: int,
 ) -> dict[str, float]:
-    """For T^2, K = 0 is the prediction. Mean kappa_hat should be near zero."""
+    """Evaluate the curvature proxy for the flat torus.
+
+    For the Clifford flat torus the intrinsic Gaussian curvature K = 0, but the
+    extrinsic second fundamental form h != 0 (it curves through R^4). By
+    Proposition 4 of the theory paper, kappa_hat -> 2|H| (mean curvature), NOT
+    to 0. The reconstruction-regime prediction for R=2, r=1, G=50 is:
+        kappa_hat* = sqrt(1/R^2 + 1/r^2) * sqrt(4/G)
+                   = sqrt(5/4) * sqrt(4/50) = sqrt(1/10) ~ 0.316
+    Values near 0.316 indicate a well-calibrated decoder; values above reflect
+    fold artifacts from the topological obstruction (pi_1(T^2) = Z x Z).
+    """
     triangles = find_triangles(edge_index, max_triangles=max_triangles)
     if triangles.shape[0] == 0:
         return {"mean_kappa": float("nan"), "expected_K": 0.0, "n_triangles": 0}
@@ -173,7 +183,9 @@ def main() -> None:
     print("  SCR-VAE vs Vanilla VAE: Flat Torus T^2 Experiment")
     print("=" * 64)
     print(f"  N={args.n_points}  G={args.ambient_dim}")
-    print(f"  R={args.major_radius}  r={args.minor_radius}  expected K=0")
+    R, r, G = args.major_radius, args.minor_radius, args.ambient_dim
+    _kappa_theory = (R**-2 + r**-2) ** 0.5 * (4 / G) ** 0.5
+    print(f"  R={R}  r={r}  K=0 (Gaussian), kappa_hat* ~{_kappa_theory:.3f} (mean-curv, recon regime)")
     print(f"  d_latent={args.dim_latent}  d_edge={args.dim_edge}")
     print(f"  device={args.device}")
 
@@ -263,9 +275,8 @@ def main() -> None:
           f"Spearman={iso_base_euclid.get('spearman', float('nan')):.4f}")
     print(f"    Riemannian pullback:  MAE={iso_base_riem['mae']:.4f}  "
           f"Spearman={iso_base_riem.get('spearman', float('nan')):.4f}")
-    # For K=0 the theory (reconstruction-regime) predicts kappa_hat -> 0.
-    # For the Clifford embedding (truly flat) this is exact.
-    print(f"    Curvature kappa_hat:  {curv_base['mean_kappa']:.4f} (theory=0 for flat torus)")
+    print(f"    Curvature kappa_hat:  {curv_base['mean_kappa']:.4f}  "
+          f"(theory~{_kappa_theory:.3f}, mean-curv proxy; lower=better)")
 
     results["baseline"] = {
         "isometry_euclidean": iso_base_euclid,
@@ -301,6 +312,9 @@ def main() -> None:
             lambda_decorr=args.lambda_decorr,
             reset_optimizer_each_iteration=not getattr(args, "no_reset_optimizer", False),
             distance_clip_factor=getattr(args, "distance_clip_factor", 5.0),
+            # Pinned to 0 to reproduce published torus_clifford results.
+            # Set to 50 for new experiments (allows rediscovery of dropped edges).
+            n_extra_candidates=0,
             log_interval=getattr(args, "log_interval", 100),
             device=args.device,
             use_wandb=_use_wandb,
@@ -338,7 +352,8 @@ def main() -> None:
           f"Spearman={iso_scrvae_euclid.get('spearman', float('nan')):.4f}")
     print(f"    Riemannian pullback:  MAE={iso_scrvae_riem['mae']:.4f}  "
           f"Spearman={iso_scrvae_riem.get('spearman', float('nan')):.4f}")
-    print(f"    Curvature kappa_hat:  {curv_scrvae['mean_kappa']:.4f} (theory=0 for flat torus)")
+    print(f"    Curvature kappa_hat:  {curv_scrvae['mean_kappa']:.4f}  "
+          f"(theory~{_kappa_theory:.3f}, mean-curv proxy; lower=better)")
 
     results["scrvae"] = {
         "isometry_euclidean": iso_scrvae_euclid,
@@ -351,7 +366,7 @@ def main() -> None:
 
     # ─── Summary ──────────────────────────────────────────────────────────────
     print("\n" + "=" * 64)
-    print("  SUMMARY: Fair Comparison (T^2, expected K=0)")
+    print(f"  SUMMARY: Clifford T^2 (K=0 Gaussian, kappa_hat* ~{_kappa_theory:.3f})")
     print("=" * 64)
     print(f"  {'Metric':<30} {'Baseline':>12} {'SCR-VAE':>12}")
     print(f"  {'-'*54}")
