@@ -88,12 +88,23 @@ def flat_torus(
     noise_std: float = 0.01,
     seed: int = 42,
 ) -> tuple[torch.Tensor, torch.Tensor, np.ndarray]:
-    """Sample points from a torus T^2 embedded in R^ambient_dim.
+    """Sample points from the STANDARD EMBEDDED torus T^2 in R^ambient_dim.
 
-    The torus has major radius R and minor radius r.
-    Gaussian curvature: K(theta, phi) = cos(phi) / (r(R + r cos(phi))),
-    which averages to zero (the torus has zero total Gaussian curvature
-    by the Gauss-Bonnet theorem, consistent with its trivial Euler characteristic 0).
+    The torus has major radius R and minor radius r. It is embedded as the
+    standard parametric surface in R^3:
+        x = (R + r cos(phi)) cos(theta),  y = (R + r cos(phi)) sin(theta),
+        z = r sin(phi)
+    then projected into R^ambient_dim via a random matrix A.
+
+    WARNING -- local Gaussian curvature is NOT zero:
+        K(theta, phi) = cos(phi) / (r * (R + r*cos(phi)))
+    which ranges from +1/(r*(R-r)) (outer equator) to -1/(r*(R+r)) (inner
+    equator). For R=2, r=1 this is +1 to -1/3. The TOTAL integral of K is
+    zero (Gauss-Bonnet), but the local curvature varies strongly.
+
+    For genuine K=0 validation (flat torus everywhere), use flat_torus_clifford()
+    instead. This function is kept for compatibility and for experiments that
+    intentionally use the standard embedded torus.
 
     Parameters
     ----------
