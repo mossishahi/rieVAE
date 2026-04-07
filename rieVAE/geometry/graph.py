@@ -98,7 +98,9 @@ def riemannian_knn_graph(
         small Dz; far-away candidate pairs produce pathologically large values
         that cause the graph to oscillate (2-cycle). Clipping at a multiple of
         the median focuses the KNN on the local regime where the linearization
-        is accurate (Lemma 1: error O(K r^3)). Set to 0 to disable clipping.
+        is accurate (Lemma 1: error O(||Gamma|| r^2) + O(K r^3); the O(r^2)
+        connection term makes clipping even more important for large Dz).
+        Set to 0 to disable clipping.
 
     Returns
     -------
@@ -128,7 +130,9 @@ def riemannian_knn_graph(
 
     # Symmetrized Riemannian distance: average of forward and backward.
     # Both ||J_f(z_i) dz_ij|| and ||J_f(z_j) dz_ji|| approximate d_R(z_i,z_j)
-    # with error O(K r^3) by Lemma 1. The symmetric average is more stable:
+    # with error O(||Gamma|| r^2) + O(K r^3) by Lemma 1 (the O(r^2) Christoffel
+    # term dominates at general base points; both terms vanish at the isometric
+    # fixed point where G(z_i) = I). The symmetric average is more stable:
     # small perturbations to f_theta shift both terms in the same direction,
     # preserving neighbor rank ordering better than either term alone.
     dists = (riemannian_distances(log_fwd) + riemannian_distances(log_bwd)) / 2.0
