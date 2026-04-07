@@ -1,0 +1,377 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{hyperref}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable}
+
+\newtcolorbox{accept}[1][]{colback=green!5,colframe=green!60!black,
+  fonttitle=\bfseries,title={Accepted: #1},breakable}
+\newtcolorbox{partial}[1][]{colback=yellow!5,colframe=orange!60!black,
+  fonttitle=\bfseries,title={Partially Accepted: #1},breakable}
+\newtcolorbox{highlight}[1][]{colback=purple!5,colframe=purple!60!black,
+  fonttitle=\bfseries,title={Major Insight: #1},breakable}
+\newtcolorbox{correct}[1][]{colback=blue!5,colframe=blue!60!black,
+  fonttitle=\bfseries,title={Correction / Fix: #1},breakable}
+
+\title{Response to Reviewer Snn46}
+\date{April 2026}
+\begin{document}
+\maketitle
+
+\section{Overall Assessment}
+
+Snn46 provides the most comprehensive and mathematically deep review of the
+four. The 1000+ line analysis contains several original theoretical contributions
+that significantly strengthen the paper. Most importantly, Snn46 identifies the
+\textbf{curvature proxy isometric calibration connection} (Proposition 4 in
+Snn46, Gap 4) which is a genuinely beautiful theoretical result that the paper
+missed. We accept all major findings.
+
+\section{Weaknesses -- Response}
+
+\subsection{W1: Fixed-Point Existence Not Proved}
+
+\begin{accept}[Accepted -- bridge proof incorporated]
+Snn46 correctly identifies that Theorem~1 characterizes properties AT a
+self-consistent pair without proving such a pair exists. Proposition~3
+(convergence) then starts ``in a neighbourhood of $(f^*, G^*)$'' without
+first establishing $G^*$ exists.
+
+\textbf{Snn46's bridge proof (Proposition 1)}: The argument is clean and correct:
+\begin{enumerate}
+  \item The set of KNN graphs $\mathcal{G}$ on $n$ finite nodes is \emph{finite}.
+  \item The composition $\Phi(G) = \mathrm{KNN}(f^*(G))$ is a self-map of
+    the finite set $\mathcal{G}$.
+  \item Under generic non-degeneracy (no tied distances), $\Phi$ has no
+    period-$p>1$ orbits, hence has a fixed point $G^*$ by the finite-set
+    fixed-point theorem.
+  \item Setting $f_\theta^* = f^*(G^*)$ gives the self-consistent pair.
+\end{enumerate}
+
+\textbf{Evaluation}: The proof is rigorous for the discrete/finite setting
+(which is our actual algorithmic setting). The ``generic non-degeneracy''
+condition (no tied Riemannian distances) holds with probability 1 under
+any continuous distribution.
+
+\textbf{Action}: Add this as Proposition~1 (Fixed-Point Existence) before
+the Fixed-Point Characterization Theorem.
+\end{accept}
+
+\subsection{W2: Proposition 3 Quasi-Circular (L* via IFT requires SC not PL)}
+
+\begin{accept}[Accepted -- clean separation of PL and SC assumptions]
+Snn46 correctly identifies that the Lipschitz constant $L_*$ of the minimizer
+map $G \mapsto f^*(G)$ follows from the IFT, which requires the Hessian
+$\nabla^2_f \mathcal{L}(f^*|G^*)$ to be strictly positive definite -- this is
+\emph{local strong convexity (SC)}, not PL. The paper conflates these.
+
+\textbf{Snn46's bridge (Proposition 3)}: Under SC on the identifiable subspace:
+\[
+  L_* = \frac{C_G}{\mu_1}, \quad C_G = \|\partial_G \nabla_f \mathcal{L}\|
+\]
+and $L_* L_G < 1$ is guaranteed for large $n$ (since $L_G = O(r_n) \to 0$).
+
+\textbf{Action}: Split the current PL assumption into (PL) for convergence rate
+and (SC) for deriving $L_*$. The paper already has Corollary~1 (SC) which does
+this; we need to make the separation explicit in the assumptions of Proposition~3.
+This is already partially done (the paper states both PL and SC assumptions in
+Proposition~3's assumption list).
+\end{accept}
+
+\subsection{W3: Assumption A4' Not Derived}
+
+\begin{accept}[Accepted -- same resolution as Op46MX]
+Snn46's bridge proof (Proposition 2) is identical in structure to Op46MX's
+Lemma~1 and gives the same result: $\delta_{\mathrm{rec}} = O(r_n^2)$ implies
+A4' with $\|G^* - g\|_{\mathrm{op}} = O(r_n)$. We accept and incorporate.
+\end{accept}
+
+\subsection{W4: Curvature Proxy Formula Inconsistency}
+
+\begin{highlight}[THE KEY INSIGHT OF ALL FOUR REVIEWS]
+Snn46's Proposition~4 (Gap~4 bridge) is the single most important theoretical
+contribution in all four reviews. It proves:
+
+\textbf{The curvature proxy $\hat{\kappa}$ simultaneously measures curvature
+AND isometric quality.}
+
+Specifically: for a decoder with Jacobian $J_{f_\theta} \approx \alpha A J_{f_{3D}}$
+where $\alpha$ is a local scale factor,
+\[
+  \hat{\kappa}(i,j,k) \approx \frac{2}{R\alpha}\sqrt{\frac{3}{G}}
+\]
+This gives:
+\begin{enumerate}
+  \item For uncalibrated decoder ($\alpha = 1$): $\hat{\kappa} \to (2/R)\sqrt{3/G}$
+    (Remark~8's formula).
+  \item At the isometric fixed point ($\alpha = \sqrt{3/G}$, i.e., pullback
+    metric = true metric): $\hat{\kappa} \to 2/R$ (Eq.~16's formula).
+  \item Therefore: $\hat{\kappa} \to 2/R$ \emph{if and only if} the decoder
+    is isometrically calibrated.
+\end{enumerate}
+
+\textbf{Mathematical evaluation of Snn46's proof}: The proof is correct and elegant.
+The isometric calibration condition $\alpha^2(G/3) = 1$ (matching pullback to
+true metric) correctly gives $\alpha = \sqrt{3/G}$, and substituting into the
+$\hat{\kappa}$ formula gives exactly $2/R$.
+
+\textbf{The implication for our experiments:}
+\begin{itemize}
+  \item The experimental target $\hat{\kappa}^* = 2.0$ in Table~1 is the
+    \emph{isometrically-calibrated} target -- correct.
+  \item The baseline's $\hat{\kappa} = 2.849 > 2.0$ overshoots because
+    Euclidean KNN includes edges across the sphere (non-geodesic), introducing
+    spurious curvature into the closure vectors.
+  \item SCR-VAE's $1.442 < 2.0$ undershoots, meaning the decoder is still
+    slightly under-calibrated (scale factor $\alpha > \sqrt{3/G}$) at our finite
+    $n$ and $T$.
+  \item As $n \to \infty$ and $T \to \infty$, SCR-VAE should converge to
+    $\hat{\kappa} = 2.0$ exactly.
+\end{itemize}
+
+\textbf{This reframes the entire experimental comparison}: the gap between
+$\hat{\kappa}$ and $2\sqrt{K}$ is a QUANTITATIVE MEASURE OF ISOMETRIC DISTORTION.
+The curvature proxy is not just detecting curvature -- it is measuring how close
+the decoder is to isometry. This is a major contribution that the paper should
+highlight.
+
+\textbf{Action}: Add Proposition (Snn46 Proposition~4) to the curvature section:
+``$\hat{\kappa} \to 2\sqrt{K}$ if and only if the decoder is isometrically
+calibrated. The deviation $|\hat{\kappa} - 2\sqrt{K}|$ is a scale-invariant
+measure of isometric distortion.''
+\end{highlight}
+
+\subsection{W5: Coefficient Error in Equation~(23)}
+
+\begin{accept}[Accepted -- minor numerical error]
+Snn46 correctly identifies that the coefficient $8R^2KA$ in Eq.~(23) should be
+$4\sqrt{K}A$. The verification:
+\[
+  \|c_{ijk}\|_{3D} = \frac{2\varepsilon^2}{R} = 2\sqrt{K}\varepsilon^2 = 4\sqrt{K} \cdot \frac{\varepsilon^2}{2} = 4\sqrt{K} \cdot A
+\]
+while $8R^2 K A = 8R^2 \cdot (1/R^2) \cdot (\varepsilon^2/2) = 4\varepsilon^2 \neq
+2\varepsilon^2/R$ unless $R = 1/2$.
+
+\textbf{Action}: Fix the coefficient in Eq.~(23). This is a minor error in the
+verification example that does not affect the main theory.
+\end{accept}
+
+\subsection{W6: Flat Torus Embeddability Factual Error}
+
+\begin{accept}[Accepted -- section 5.5 factual error]
+Snn46 is correct. The paper's Section~5.5 states ``the flat torus cannot be
+isometrically embedded in Euclidean space of any finite dimension smaller than
+$\dim M$.'' This is WRONG.
+
+Correct statement: The flat torus CAN be smoothly isometrically embedded in
+$\mathbb{R}^4$ via the Clifford embedding:
+$(\theta,\phi) \mapsto (\cos\theta, \sin\theta, \cos\phi, \sin\phi)/\sqrt{2}$.
+
+The CORRECT obstruction is: no smooth isometric embedding in $\mathbb{R}^3$
+(Efimov's theorem: compact surfaces of non-positive curvature cannot be
+$C^2$-embedded in $\mathbb{R}^3$).
+
+\textbf{Action}: Fix Section~5.5 to state: ``The flat torus cannot be smoothly
+isometrically embedded in $\mathbb{R}^3$, but embeds isometrically in
+$\mathbb{R}^4$ via the Clifford map. The current experiments use the round
+(embedded) torus in $\mathbb{R}^3$ with nonzero Gaussian curvature, not the
+flat torus.''
+\end{accept}
+
+\subsection{W7: Torus Wrong Manifold}
+
+\begin{accept}[Accepted -- consistent with all other reviewers]
+Same as op46 and Op46MX. Fix: Clifford torus.
+\end{accept}
+
+\subsection{W8 / B2: Edge KL Absent from Theoretical Loss Equation}
+
+\begin{accept}[Accepted -- dedicated fix made to Equation (3)]
+Snn46 correctly identifies that the code's \texttt{SCRVAELoss.forward()}
+computes four terms (including edge KL with $\beta_e = 10^{-3}$) while
+Equation~(3) in the paper has only three.
+
+\textbf{Why this matters}: The edge KL penalizes the edge codes toward
+$\mathcal{N}(0, I_k)$. Under $\beta_e \ll 1$, this is perturbative: the
+fixed-point theorem (Theorem~1(c)) and the Eckart-Young frame analysis
+(Proposition~1) both treat $e_{ij}$ as a latent code optimized to minimize
+the Riemannian loss. The edge KL slightly biases the codes toward zero but
+does not change which directions $W$ spans at leading order (since
+$\beta_e \mathcal{L}_{\mathrm{edge-KL}} \ll \lambda \mathcal{L}_{\mathrm{Riem}}$
+in practice). However, the edge KL \textbf{directly affects the optimization
+trajectory} and thus influences which fixed point is reached -- this is the
+point Snn46 makes that deserves acknowledgment.
+
+\textbf{Fix applied to paper}: Equation~(3) now includes all four terms:
+$\mathcal{L} = \mathcal{L}_{\mathrm{recon}} + \beta\mathcal{L}_{\mathrm{KL}}
++ \lambda\mathcal{L}_{\mathrm{Riem}} + \beta_e\mathcal{L}_{\mathrm{edge-KL}}$,
+with a note that the edge KL is perturbative ($\beta_e = 10^{-3}$) and does
+not affect the frame characterization at leading order.
+\end{accept}
+
+\section{Code Bugs -- Response}
+
+\subsection{B1: Broken Test}
+
+\begin{accept}[Accepted]
+\texttt{edge\_decoder.W.bias} raises AttributeError since \texttt{W} is private
+(\texttt{\_W}) and the public interface is \texttt{weight}. Fix:
+\begin{verbatim}
+assert not any('bias' in name
+               for name, _ in model.edge_decoder.named_parameters())
+\end{verbatim}
+\end{accept}
+
+\subsection{B3: Symmetrized E-step Distance Not Documented}
+
+\begin{accept}[Accepted]
+The code uses $(w_{fwd} + w_{bwd})/2$ but the paper defines $d^R_{ij}$ using
+only the forward JVP. Both are within Lemma~1's error bound. Will document.
+\end{accept}
+
+\subsection{B4: Candidate Set Not Exhaustive}
+
+\begin{accept}[Accepted]
+The default \texttt{n\_extra\_candidates = 0} means once an edge is dropped
+from the graph, it can never return. For the torus where 2-cycles can drop
+edges spuriously, this creates permanent information loss.
+
+\textbf{Fix}: Change default to \texttt{n\_extra\_candidates = 50} (or $\sim k$).
+This allows the graph to recover edges that were spuriously dropped due to
+linearization artifacts in early iterations.
+\end{accept}
+
+\subsection{B5: Torus Geodesic Bug}
+
+\begin{accept}[Accepted -- same as all other reviewers]
+Fix: Clifford torus.
+\end{accept}
+
+\subsection{B6: Incorrect Code Comment in curvature.py}
+
+\begin{accept}[Accepted]
+The comment ``$\hat{\kappa} = 2\sqrt{K}$ for constant-curvature manifolds''
+is only correct at the isometrically-calibrated fixed point. Fix the comment
+to: ``$\hat{\kappa} \to 2\sqrt{K}$ at the isometrically-calibrated fixed point;
+the value depends on decoder scale in general.''
+\end{accept}
+
+\section{Sphere vs. Torus Analysis -- Evaluation}
+
+Snn46's analysis in Section~5 is the most mathematically complete account of
+why the sphere outperforms the torus. The four levels identified are:
+
+\subsection{Topological Obstruction ($\pi_1(T^2) = \mathbb{Z}^2$)}
+Correct and fundamental. The encoder must ``cut'' the torus, creating artificial
+boundary artifacts. The Riemannian loss then penalizes cross-boundary pairs that
+are truly close on $T^2$ but far in latent space. This is irreconcilable for
+any smooth single-chart encoder.
+
+\subsection{Wrong Manifold (Round vs. Flat Torus)}
+Correct and critical. The data has varying nonzero $K$, the evaluation uses
+flat-torus geodesics. This is the \emph{primary} explanation for the torus
+performance gap in the current experiments.
+
+\subsection{Linearization Artifact Scale}
+Correct. For cross-boundary pairs with $\|\Delta z\| = O(L)$ (full period),
+the linearization error is $O(K_{\max} L^3) \gg O(K_{\max} r_n^3)$. The
+distance clipping prevents the worst cases from entering KNN but does not
+resolve the topological issue.
+
+\subsection{Holonomy of Non-Contractible Loops}
+This is the most profound observation: the curvature proxy $c_{ijk}$ measures
+\emph{contractible} triangle holonomy. The torus has additional non-contractible
+holonomy that the triangle-based proxy cannot detect. This explains why even
+at the fixed point, the torus curvature signal is dominated by the topological
+structure rather than the local differential geometry.
+
+\textbf{Action}: Add a paragraph on non-contractible holonomy to the sphere-vs-
+torus discussion, mentioning that extending the curvature certificate to
+non-contractible loops (detecting topology, not just curvature) is an
+important future direction.
+
+\subsection{KL Prior Asymmetry}
+Snn46's quantitative estimate of the aspect ratio conflict (KL prefers square
+$L_1 = L_2$, torus prefers $L_1/L_2 = R/r = 2$) is a nice concrete illustration
+of the prior mismatch.
+
+\section{Follow-Up Points Raised by Snn46 on the Response}
+
+\subsection{Lemma 1 Step 3: Correct Justification}
+
+Snn46 correctly notes that the result is still right via the metric
+transformation law $J_\varphi^\top J_\varphi = G(z_i)$:
+\[
+  \|\xi\|_{\mathrm{Eucl}}^2 = \xi^\top\xi
+  \approx \Delta z_{ij}^\top J_\varphi^\top J_\varphi \Delta z_{ij}
+  = \Delta z_{ij}^\top G(z_i) \Delta z_{ij}
+  = \|\Delta z_{ij}\|_{G(z_i)}^2
+\]
+This is exactly what the proof needs. The wrong sentence ``$J_\varphi = I_d$''
+has been replaced in the paper with the correct argument via the metric
+transformation law, including a correction remark.
+
+\subsection{W1: Fixed-Point Existence -- Weakened Claim}
+
+Snn46 correctly notes that ruling out period-$p > 1$ cycles via ``generic
+non-degeneracy'' is informal: a generic self-map of a finite set has fixed
+points OR cycles; additional structure (e.g., that $\Phi$ is a contraction
+under Hamming distance) is needed to rule out cycles.
+
+\textbf{Fix applied to paper}: Proposition~\ref{prop:existence} now states
+both cases explicitly:
+\begin{itemize}
+  \item Case (a): fixed point ($p=1$) -- gives a self-consistent pair directly.
+  \item Case (b): cycle ($p>1$) -- the algorithm cycles through $p$ graphs;
+    a fixed point exists but is not reached from this initialization.
+\end{itemize}
+The remark explains that cycles are eliminated in practice by the distance-clipping
+mechanism (which stabilizes the ranking and prevents the near-tie flips that
+cause cycles), as confirmed empirically by observing convergence on both
+test manifolds. This is an honest statement that avoids the informal
+``perturbation'' escape.
+
+\subsection{W4: Position-Varying Scale Factor}
+
+Snn46 correctly notes that the proof of Proposition~4 assumes a uniform scalar
+scale factor $\alpha(z)$ across the manifold. For a nonlinear decoder, $\alpha$
+varies with position, so $\hat{\kappa}(i,j,k)$ depends on the specific triangle,
+not just on $K$ and $R$.
+
+\textbf{Fix applied to paper}: The theoretical prediction paragraph in the
+experiments section now includes three explicit caveats:
+\begin{enumerate}[(i)]
+  \item The value $\hat{\kappa}^* = 2/R$ is the asymptotic isometric target.
+  \item For nonlinear decoders, $\hat{\kappa}$ varies across triangles due to
+    position-varying $\alpha(z_i)$ -- the experiments report the \emph{mean}
+    over many triangles.
+  \item The deviation from $2\sqrt{K}$ quantifies remaining isometric distortion.
+\end{enumerate}
+This makes the experimental comparison honest: the reported $\hat{\kappa}$ is
+a \emph{triangle-averaged} proxy, and its comparison to $2/R$ gives the
+average isometric calibration quality.
+
+\section{Summary of Accepted vs. Deferred Findings}
+
+\begin{tabular}{lll}
+\hline
+Finding & Decision & Priority \\
+\hline
+Fixed-point existence proof (Brouwer/finite-set) & Accept & High \\
+SC vs PL separation for $L_*$ derivation & Accept & Medium \\
+A4' from capacity condition & Accept & High \\
+Curvature proxy = isometry quality metric & Accept (major insight) & Critical \\
+Coefficient error in Eq.~(23): $8R^2KA \to 4\sqrt{K}A$ & Accept & Minor \\
+Flat torus embeddability factual error & Accept & Minor \\
+Torus wrong manifold (round vs. flat) & Accept & Critical \\
+Edge KL absent from loss & Accept & Moderate \\
+Broken test B1 & Accept & Minor \\
+Symmetrized distance not documented B3 & Accept & Minor \\
+Candidate set not exhaustive B4 & Accept & Moderate \\
+Code comment error B6 & Accept & Minor \\
+Non-contractible holonomy discussion & Accept as future direction & Low \\
+\hline
+\end{tabular}
+
+\end{document}

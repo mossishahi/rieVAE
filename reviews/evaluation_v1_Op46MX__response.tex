@@ -1,0 +1,286 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{hyperref}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable}
+
+\newtcolorbox{accept}[1][]{colback=green!5,colframe=green!60!black,
+  fonttitle=\bfseries,title={Accepted: #1},breakable}
+\newtcolorbox{partial}[1][]{colback=yellow!5,colframe=orange!60!black,
+  fonttitle=\bfseries,title={Partially Accepted: #1},breakable}
+\newtcolorbox{correct}[1][]{colback=blue!5,colframe=blue!60!black,
+  fonttitle=\bfseries,title={Key Insight / Correction: #1},breakable}
+\newtcolorbox{dispute}[1][]{colback=red!3,colframe=red!50!black,
+  fonttitle=\bfseries,title={Contested / Nuanced: #1},breakable}
+
+\title{Response to Reviewer Op46MX}
+\date{April 2026}
+\begin{document}
+\maketitle
+
+\section{Overall Assessment}
+
+Op46MX provides an extremely detailed review with several original mathematical
+contributions. The most important is the \textbf{corrected curvature proxy
+scaling law} which resolves the apparent inconsistency between Equation~(16)
+and Remark~8. The review also correctly identifies the torus data bug, the edge
+KL term, and sphere sampling non-uniformity. We accept all critical findings.
+
+\section{Critical Weaknesses -- Response}
+
+\subsection{W1: Assumption A4' (Critical)}
+
+\begin{accept}[Accepted -- Sobolev interpolation lemma (Lemma 1 of Op46MX)]
+Op46MX provides the clearest statement and proof of the capacity condition:
+\textbf{Lemma 1 (Jacobian control via Sobolev interpolation)}: under bounded
+Hessian and reconstruction accuracy $\delta$ at training points,
+\[
+  \|J_{f^*}(z) - J_{f_{\mathrm{true}}}(z)\|_{\mathrm{op}} \leq \frac{2\delta}{r_n} + \kappa r_n
+\]
+and \textbf{Corollary 1}: if $\delta_{\mathrm{rec}} = O(r_n^2)$ then A4' holds
+with $\|G^* - g\|_{\mathrm{op}} = O(r_n)$.
+
+\textbf{Evaluation of the proof}: The proof is correct. The key step uses the
+Taylor expansion and reconstruction accuracy at adjacent training points to bound
+the directional Jacobian difference. The proof is cleaner than the finite-
+difference argument we had. We will incorporate this lemma and corollary into
+the paper, with attribution.
+
+\textbf{Concerning the decoder capacity requirement}: Op46MX notes that for $d=2$,
+$n=3000$, the Barron-type bound requires hidden width $\geq 400$, and our
+hidden widths 128/256 ``may be marginal.'' This is a fair empirical concern.
+We will add an empirical verification (plotting $\|G^* - g\|$ vs.\ $r_n$
+for the sphere where the true metric is known analytically) to validate
+that A4' holds approximately in our experimental regime.
+\end{accept}
+
+\subsection{W2: Curvature Proxy Prediction Inconsistency (Critical)}
+
+\begin{correct}[The most important theoretical insight of this review]
+Op46MX provides the derivation showing that:
+\[
+  \hat{\kappa} = \frac{\|c_{ijk}\|}{\|\ell_{ij}\|\|\ell_{ik}\|}
+  \approx \frac{2}{R} \cdot \frac{1}{\sqrt{G/3}} = \frac{2}{R}\sqrt{\frac{3}{G}}
+\]
+for an uncalibrated random embedding with $A \sim \mathcal{N}(0, 1/\sqrt{3})$.
+For $R=1$, $G=50$: $\hat{\kappa}^* = 0.4899$.
+
+This directly contradicts Eq.~(16)'s claim of $\hat{\kappa} \to 2/R = 2.000$.
+
+\textbf{Mathematical evaluation}: Op46MX's derivation is correct. In the
+ambient space, both the numerator $\|c_{ijk}\|$ and denominator
+$\|\ell_{ij}\|\|\ell_{ik}\|$ are scaled by factors of $\sqrt{G/3}$:
+\[
+  \hat{\kappa} = \frac{\sqrt{G/3} \cdot 2\varepsilon^2/R}{(G/3)\varepsilon^2} = \frac{2}{R\sqrt{G/3}}
+\]
+The numerator scales as $\sqrt{G/3}$ while the denominator scales as $G/3$,
+leaving a $1/\sqrt{G/3}$ factor that Eq.~(16) omits.
+
+\textbf{However} -- and this is the KEY insight from reviewer Snn46 --
+$\hat{\kappa} \to 2/R$ holds \emph{at the isometric fixed point} where the
+decoder's pullback metric equals the true metric. The factor $\sqrt{3/G}$ cancels
+when the decoder is isometrically calibrated (scale factor $\alpha = \sqrt{3/G}$).
+
+\textbf{Resolution}: Both formulas are correct for different regimes:
+\begin{itemize}
+  \item Uncalibrated decoder (baseline or early training): $\hat{\kappa} \to (2/R)\sqrt{3/G}$
+  \item Isometrically calibrated decoder (at fixed point): $\hat{\kappa} \to 2/R$
+\end{itemize}
+This makes $\hat{\kappa}$ a DUAL metric: curvature detector AND isometry quality
+measure. The experimental target $\hat{\kappa}^* = 2.0$ (used in our Table 1)
+is the \emph{asymptotic isometric target}, not the uncalibrated prediction.
+
+\textbf{Action}: Remove the current Eq.~(16) (which incorrectly claims it is
+``scale-invariant'' for all decoders) and replace with a Proposition stating:
+\begin{enumerate}
+  \item For uncalibrated decoders: $\hat{\kappa} \to (2/R)\sqrt{3/G}$
+  \item At the isometric fixed point: $\hat{\kappa} \to 2/R = 2\sqrt{K}$
+  \item Corollary: $\hat{\kappa} = 2\sqrt{K}$ is achievable \emph{if and only
+    if} the decoder is isometrically calibrated.
+\end{enumerate}
+This transforms the experimental comparison: SCR-VAE's $1.442$ vs. baseline's
+$2.849$ (for sphere, true target $2.0$) shows the SCR-VAE is closer to the
+isometric target despite the baseline overshooting due to Euclidean KNN
+spurious curvature effects.
+\end{correct}
+
+\subsection{W3: Torus Wrong Manifold (Critical)}
+
+\begin{accept}[Accepted -- confirmed critical bug]
+Op46MX correctly confirms the standard torus has
+$K(\phi) = \cos\phi/[r(R+r\cos\phi)]$ ranging from $+1/3$ to $-1$ for $R=2, r=1$.
+The evaluation metric uses the flat formula.
+
+\textbf{Additional quantification by Op46MX}: At the outer equator, the relative
+error in the $\theta$-direction metric is $(R+r)^2/R^2 - 1 = 125\%$ for $R=2, r=1$.
+This completely invalidates the torus isometry MAE comparison.
+
+\textbf{Fix}: Clifford torus in $\mathbb{R}^4$ as specified. Priority: Critical.
+\end{accept}
+
+\subsection{W4: Global Convergence (Major)}
+
+\begin{partial}[Accepted as limitation]
+The ``basin of attraction'' question is inherent to non-convex optimization.
+A formal condition of the form ``$K_{\max} r_n^{(0)} < c$ implies Euclidean
+KNN $\approx$ Riemannian KNN'' would be valuable. We note this as Open
+Problem~2.
+\end{partial}
+
+\subsection{W5: Edge KL Not in Theoretical Loss (Moderate)}
+
+\begin{accept}[Accepted -- will add to Equation (3)]
+Op46MX correctly identifies that the code computes four loss terms while
+Equation~(3) in the paper has only three. The edge KL term
+$\beta_e \mathcal{L}_{\mathrm{edge\_KL}}$ (with $\beta_e = 10^{-3}$) acts as
+a variational regularizer on the edge encoder $h_\psi$.
+
+\textbf{Effect on theory}: Under $\beta_e \ll 1$, the edge KL is perturbative
+and does not affect the fixed-point characterization (Theorem~1) at leading
+order. However, it should be acknowledged in Equation~(3) for honesty.
+
+\textbf{Action}: Add the edge KL term to Equation~(3) with a note that
+$\beta_e = 10^{-3}$ makes it perturbative.
+\end{accept}
+
+\section{Discrepancy D3: Sphere Sampling Not Uniform}
+
+\begin{accept}[Accepted -- minor but will be fixed]
+Op46MX correctly notes that using $\theta \sim \mathrm{Uniform}[0, \pi]$ gives
+non-uniform density on $S^2$ (true uniform requires $\theta = \arccos(1-2U)$).
+This technically violates Assumption~A3 (density bounded below by $\rho_{\min}$).
+
+In practice, the Euclidean projection still gives $\rho_{\min} > 0$ everywhere
+(the non-uniformity is not severe for our purposes), but we will fix this
+for theoretical consistency.
+
+\textbf{Action}: Update \texttt{sphere()} in \texttt{data/synthetic.py} to
+use $\theta = \arccos(1-2U)$ for uniform sampling.
+\end{accept}
+
+\section{Bridging Gaps -- Evaluation of Op46MX's Proofs}
+
+\subsection{Lemma 1 (Sobolev Interpolation)}
+
+\textbf{Mathematical evaluation}: \textbf{Correct and clean}. The proof correctly
+uses the Taylor expansion of $f_\theta$ and $f_{\mathrm{true}}$ at adjacent points
+to bound the Jacobian difference via the reconstruction error. The corollary is
+an immediate consequence. This is the cleanest version of this argument among
+all four reviewers.
+
+\textbf{Decision}: Incorporate as Lemma and Corollary after Assumption A4'.
+
+\subsection{Corrected Scaling Law for Curvature Proxy (Proposition 2)}
+
+\textbf{Mathematical evaluation}: The computation is correct. The key formula:
+\[
+  \hat{\kappa} = \frac{\|Ac\|}{\|A\ell_{ij}\|\|A\ell_{ik}\|}
+  \approx \frac{\sigma\sqrt{G}\|c\|}{(\sigma\sqrt{G})^2 \|\ell_{ij}\|\|\ell_{ik}\|}
+  = \frac{\hat{\kappa}^{d+1}}{\sigma\sqrt{G}}
+\]
+correctly shows the $1/(\sigma\sqrt{G})$ factor that the paper's Eq.~(16) omits.
+For $\sigma = 1/\sqrt{3}$: $\hat{\kappa} = \hat{\kappa}^{d+1} / (\sqrt{G/3})$.
+
+\textbf{Nuance}: This formula holds for \emph{uncalibrated} decoders. At the
+isometric fixed point (from Snn46's analysis), the denominator scales differently
+because the log maps are rescaled to match the true metric, canceling the
+$1/\sqrt{G/3}$ factor.
+
+\textbf{Decision}: Include both formulas (uncalibrated and calibrated) in the paper.
+
+\subsection{Isometry Lower Bound for Torus (Section 5.3)}
+
+\textbf{Mathematical evaluation}: The lower bound $\max|d_R^* - d_M| \geq \pi r$
+follows from the Borsuk-Ulam-type argument: any continuous $g: T^2 \to \mathbb{R}^2$
+must identify antipodal points on the shorter generating circle (length $2\pi r$).
+The proof sketch is valid.
+
+\textbf{Note}: The bound $\pi r = \pi$ (for $r=1$) is the \emph{worst-case}
+error; the average-case MAE of $\approx 1.35$ is indeed below this bound because
+random pair sampling avoids the worst-case antipodal pairs.
+
+\textbf{Decision}: Add this as a Proposition to the paper.
+
+\subsection{Multi-scale Iteration for Torus}
+
+\begin{partial}[Interesting but deferred]
+Op46MX proposes a coarse-to-fine KNN strategy (large $k$ initially, decreasing
+over iterations). This is a practical improvement but requires algorithmic
+changes. We defer to future work.
+\end{partial}
+
+\section{Op46MX Follow-Up: Correction on Curvature Proxy Target}
+
+Op46MX disputes the dual-regime framing adopted from Snn46 and identifies a
+physical error: the "isometric calibration" condition $\alpha = \sqrt{3/G}$
+is unreachable under MSE training.
+
+\begin{correct}[Critical correction accepted -- Op46MX is right]
+Snn46's algebra is correct: substituting $\alpha = \sqrt{3/G}$ into
+$\hat{\kappa} = (2/(R\alpha))\sqrt{3/G}$ gives $\hat{\kappa} = 2/R$. However,
+the premise $\alpha = \sqrt{3/G} \approx 0.245$ requires the decoder to output
+4$\times$ smaller than the data (since $\|Af_{3D}\| \approx \sqrt{G/3} \approx 4$
+for $G=50$). Under MSE training the reconstruction loss $\approx (1-\alpha)^2
+\|Af_{3D}\|^2 \approx 9.5$ at this scale -- enormous compared to the observed
+$\approx 0.01$. MSE training drives $\alpha \to 1$, not $\alpha \to \sqrt{3/G}$.
+
+\textbf{Correct comparison target:} For $\alpha = 1$ (data-matching decoder,
+which is what MSE training produces): $\hat{\kappa}_{\mathrm{theory}} =
+(2/R)\sqrt{3/G} = 0.4899$ for $R=1$, $G=50$.
+
+\textbf{Both models overshoot 0.4899} (baseline 2.849, SCR-VAE 1.442) because
+finite triangle sizes and non-local graph edges inflate the closure vectors
+beyond the $\varepsilon \to 0$ prediction. The improvement from using
+Riemannian KNN (local edges) vs. Euclidean KNN (non-local edges) is:
+\begin{align*}
+  \text{Baseline deviation:} &\quad |2.849 - 0.489| = 2.360 \\
+  \text{SCR-VAE deviation:} &\quad |1.442 - 0.489| = 0.953 \\
+  \text{Improvement:} &\quad 59.6\% \quad (\text{was incorrectly reported as } 34\%)
+\end{align*}
+The experimental result is actually \emph{stronger} under the correct comparison.
+
+\textbf{Actions}:
+\begin{enumerate}
+  \item Update Table~1: change ``True'' column for $S^2$ from $2.000$ to $0.4899$.
+  \item Update curvature proxy prediction paragraph to use the reconstruction-regime
+    formula $(2/R)\sqrt{3/G}$ as the experimental comparison target.
+  \item Add note: $2/R$ is the asymptotic isometric limit (unreachable with MSE
+    training); $(2/R)\sqrt{3/G}$ is the reconstruction-dominated regime target.
+  \item Report improvement as $59.6\%$ in the paper.
+  \item Alternatively (Op46MX's option 2): define a normalized proxy
+    $\tilde{\kappa} = \hat{\kappa} \cdot \sqrt{G/3}$ and compare to $2/R = 2.0$.
+    Both normalizations are equivalent; we will use the raw proxy with target $0.4899$.
+\end{enumerate}
+\end{correct}
+
+\begin{partial}[Minor concerns -- partially accepted]
+\textbf{``SCR-VAE moving toward isometric target'' framing}: Op46MX correctly
+notes this is misleading without tracking $\alpha$ separately. Corrected framing:
+``SCR-VAE reduces curvature artifacts from non-local Euclidean KNN edges.''
+
+\textbf{Overshoot explanation}: Op46MX notes that $\hat{\kappa} > 0.489$ could
+reflect $\alpha < \sqrt{3/G}$ or finite-triangle effects. We agree both are
+possible; we add a note in the paper acknowledging this ambiguity. Measuring
+$\alpha$ directly (as the ratio of mean log-map norm to theoretical prediction)
+would disambiguate, and we will add this as an additional diagnostic metric.
+\end{partial}
+
+\section{Action Items from Op46MX}
+
+\begin{tabular}{lll}
+\hline
+Item & Status & Priority \\
+\hline
+Fix torus: Clifford embedding in $\mathbb{R}^4$ & Accept & Critical \\
+Resolve curvature proxy formula (dual regime) & Accept + significant & Critical \\
+Add edge KL to Equation (3) & Accept & Moderate \\
+Fix sphere sampling to uniform & Accept & Minor \\
+Sobolev lemma for A4' & Accept & High \\
+Empirical verification of A4' & Accept & Moderate \\
+Isometry lower bound for torus & Accept & Moderate \\
+Multi-scale iteration & Defer & Low \\
+\hline
+\end{tabular}
+
+\end{document}

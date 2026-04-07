@@ -1,0 +1,1002 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{hyperref}
+\usepackage{tcolorbox}
+\usepackage{enumerate}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\tcbuselibrary{breakable,skins}
+
+\newtcolorbox{reviewbox}[1][]{enhanced,breakable,
+  colback=blue!5,colframe=blue!60!black,
+  fonttitle=\bfseries\small,
+  title={#1},
+  arc=2pt,boxrule=0.8pt,
+  left=5pt,right=5pt,top=4pt,bottom=4pt,
+  before skip=8pt,after skip=8pt}
+
+\newtcolorbox{gapbox}[1][]{enhanced,breakable,
+  colback=red!5,colframe=red!70!black,
+  fonttitle=\bfseries\small,
+  title={Gap: #1},
+  arc=2pt,boxrule=0.8pt,
+  left=5pt,right=5pt,top=4pt,bottom=4pt,
+  before skip=8pt,after skip=8pt}
+
+\newtcolorbox{bridgebox}[1][]{enhanced,breakable,
+  colback=green!5,colframe=green!60!black,
+  fonttitle=\bfseries\small,
+  title={Bridge: #1},
+  arc=2pt,boxrule=0.8pt,
+  left=5pt,right=5pt,top=4pt,bottom=4pt,
+  before skip=8pt,after skip=8pt}
+
+\newtcolorbox{bugbox}[1][]{enhanced,breakable,
+  colback=orange!8,colframe=orange!80!black,
+  fonttitle=\bfseries\small,
+  title={Code Issue: #1},
+  arc=2pt,boxrule=0.8pt,
+  left=5pt,right=5pt,top=4pt,bottom=4pt,
+  before skip=8pt,after skip=8pt}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+\newtheorem{claim}{Claim}
+
+\DeclareMathOperator{\col}{col}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\vol}{vol}
+\newcommand{\dR}{d^{\mathrm{R}}}
+\newcommand{\dM}{d^{\mathrm{M}}}
+\newcommand{\JVP}{\mathrm{JVP}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Kmax}{K_{\max}}
+\newcommand{\rn}{r_n}
+
+\title{\textbf{Expert Theory Review \& Gap Analysis}\\
+\large Self-Consistent Riemannian Variational Autoencoders:\\
+Toward Isometric Generative Models of Unknown Data Manifolds\\[6pt]
+\normalsize Internal Evaluation --- NeurIPS 2026 Submission\\
+Document ID: \texttt{evaluation\_v1\_Snn46}}
+
+\author{Reviewer (Internal)}
+\date{April 2026}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+%% ====================================================================
+\section{Executive Summary}
+%% ====================================================================
+
+This document provides a detailed theory-only review of the SCR-VAE paper as if
+submitted to NeurIPS 2026, followed by a line-by-line gap analysis, mathematical
+bridge proofs for each gap, a comprehensive code-versus-theory audit, and a
+deep investigation of the sphere-vs.-torus performance asymmetry. No code
+changes are proposed; this is a purely theoretical and analytical document.
+
+\paragraph{Overall assessment.}
+The paper makes a genuinely novel contribution: co-evolving the data graph and
+the decoder's Riemannian geometry until they are self-consistent is a compelling
+and well-motivated idea. The proofs of the principal-tangent-frame proposition
+and the linearized distance lemma are rigorous and technically correct. The
+curvature certificate via the ambient closure vector is elegant. Several gaps,
+one formula inconsistency, one factual error about flat-torus embeddings, and
+a mismatch between the theoretical prediction and the experimental setup are
+identified below. These require revision before publication.
+
+%% ====================================================================
+\section{NeurIPS Reviewer Assessment (Theory Only)}
+%% ====================================================================
+
+\subsection{Strengths}
+
+\begin{enumerate}
+\item \textbf{Conceptual novelty.}
+The self-consistent co-evolution of the KNN graph and the decoder metric is a
+principled approach to the isometry problem. The analogy to EM (M-step / E-step)
+is appropriate and pedagogically useful.
+
+\item \textbf{Lemma 1 (linearized distance approximation).}
+The proof is rigorous. Working in geodesic normal coordinates, exploiting
+the vanishing Christoffel symbols at the base point (property NC3), and applying
+the Bertrand--Puiseux expansion to obtain the tight $K_{\max} r^3 / 6$ bound is
+mathematically correct. The improvement over the naive $O(\|\Delta z\|^2)$ claim
+(explained by the orthogonality of the Christoffel correction in normal
+coordinates) is a genuine technical contribution.
+
+\item \textbf{Principal tangent frame (Proposition 1).}
+The identification of $\col(W^*)$ with the top-$k$ eigenspace of the Riemannian
+second-moment operator $M_\theta$ via the Eckart--Young--Mirsky theorem is exact
+and correctly stated.
+
+\item \textbf{Curvature certificate.}
+The derivation that $c_{ijk}$ lies in the normal space of $M_{\theta^*}$ to
+leading order (Proposition 3), and the connection to the second fundamental form
+via the Taylor expansion of the Jacobian along the triangle, is mathematically
+elegant and correct. The observation that $P_T c_{ijk} = O(\varepsilon^3)$
+(making $W^* \mathrm{Hol}^* \approx 0$) is a non-obvious and important result.
+
+\item \textbf{Honest limitations.}
+The ``What is Proven, What is Not'' table is commendable. Explicitly marking the
+E-step non-monotonicity (Remark 2) and the conditional nature of Theorem 2 are
+marks of intellectual honesty rare in venue submissions.
+\end{enumerate}
+
+\subsection{Weaknesses and Required Revisions}
+
+\begin{enumerate}
+\item \textbf{Fixed-point existence is not proved.}
+The Fixed-Point Characterization Theorem characterizes properties \emph{at} a
+self-consistent pair but does not prove such a pair exists. The Convergence
+Proposition (Proposition 2) starts ``in a neighbourhood of $(f_\theta^*, G^*)$''
+without first guaranteeing this object exists. This is a logical gap.
+
+\item \textbf{Proposition 2 has a quasi-circular structure.}
+The contractiveness condition requires $L_* L_G < 1$, where $L_*$ is the
+Lipschitz constant of the minimizer map $f^*(G) = \arg\min_f \mathcal{L}(\cdot |
+G)$. Bounding $L_*$ rigorously requires the implicit function theorem, which in
+turn requires the Hessian $\nabla^2_{f}\mathcal{L}(f^*|G^*)$ to be
+\emph{strictly positive definite} -- a condition strictly stronger than PL. This
+circular dependency must be resolved.
+
+\item \textbf{Assumption A4' (metric approximation) is not derived.}
+The Remark following A4' correctly identifies that the finite-difference bound
+gives $\|G^* - g\|_{\mathrm{op}} = O(\delta_{\mathrm{rec}}/r_n + r_n)$, which
+has a $1/r_n$ blowup. A4' postulates the $O(\delta_{\mathrm{rec}})$ bound
+without deriving it. This is only automatic under the capacity condition
+$\delta_{\mathrm{rec}} = O(r_n^2)$, which should be stated as an assumption.
+
+\item \textbf{The curvature proxy formula is inconsistent across sections.}
+Remark 4 correctly derives $\hat{\kappa}^* \to (2/R)\sqrt{3/G}$ for a random
+embedding into $\R^G$, but Section 5.1 and Table 1 use $\hat{\kappa}^* = 2/R$
+as the ``True'' value with $G = 50$. These are inconsistent. The resolution
+(detailed in Section~\ref{sec:curv_formula} below) is that $\hat{\kappa} \to 2/R$
+holds only when the decoder is isometrically calibrated (pullback metric =
+true metric). This deep connection between isometric quality and the curvature
+proxy value should be made explicit.
+
+\item \textbf{Factual error about flat-torus embeddability.}
+Section 5.5 (Isometry floor) states: ``the flat torus cannot be isometrically
+embedded in Euclidean space of any finite dimension smaller than $\dim M$.''
+This is false. The flat torus $T^2 = \R^2/\Z^2$ admits a smooth isometric
+embedding into $\R^4$ via $(\theta, \phi) \mapsto (\cos\theta, \sin\theta,
+\cos\phi, \sin\phi)/\sqrt{2}$, and more generally into $\R^G$ for all $G \ge 4$.
+The correct statement is: the flat torus cannot be \emph{smoothly} isometrically
+embedded in $\R^3$.
+
+\item \textbf{Coefficient error in Equation (23).}
+Section 5.3 states $\|c_{ijk}\| = (2\varepsilon^2/R) = 8R^2 \cdot K \cdot
+A(i,j,k)$ for $K = 1/R^2$, $A = \varepsilon^2/2$. Computing: $8R^2 \cdot
+(1/R^2) \cdot (\varepsilon^2/2) = 4\varepsilon^2 \neq 2\varepsilon^2/R$ unless
+$R = 1/2$. The correct relation is $\|c_{ijk}\| = 4\sqrt{K} \cdot A$, since
+$2\varepsilon^2/R = 2\sqrt{K} \varepsilon^2 = 4\sqrt{K} \cdot (\varepsilon^2/2)$.
+
+\item \textbf{The torus experiment uses the wrong manifold.}
+The data is generated on the \emph{embedded} (round) torus in $\R^3$ with
+Gaussian curvature $K(\theta, \phi) = \cos\phi / [r(R + r\cos\phi)]$, which
+varies from positive to negative. The paper refers to this as the ``flat torus
+$T^2$ (zero Gaussian curvature $K=0$)'' -- using average $K = 0$ (Gauss-Bonnet)
+in place of the local $K$. The evaluation metric $d_M = \sqrt{(R\Delta\theta)^2
++ (r\Delta\phi)^2}$ is the flat torus metric, not the geodesic distance on the
+embedded torus. These mismatches significantly affect all quantitative claims
+about the torus experiment.
+
+\item \textbf{Edge KL term absent from paper's loss.}
+The code computes $\mathcal{L} = \mathcal{L}_{\mathrm{recon}} + \beta_{\mathrm{node}}
+\mathcal{L}_{\mathrm{node\,KL}} + \lambda \mathcal{L}_{\mathrm{Riem}}
++ \beta_{\mathrm{edge}} \mathcal{L}_{\mathrm{edge\,KL}}$ (four terms), but
+Equation~(3) in the paper has only three terms. The edge-KL term is used
+in training but absent from the stated loss.
+\end{enumerate}
+
+%% ====================================================================
+\section{Theory Gaps and Mathematical Bridges}
+%% ====================================================================
+
+\subsection{Gap 1: Existence of a Self-Consistent Fixed Point}
+
+\begin{gapbox}[Fixed-point existence]
+Theorem 1 characterizes what holds \emph{at} a self-consistent pair
+$(f_\theta^*, G^*)$ but does not prove such a pair exists. Proposition 2 then
+assumes convergence to a neighbourhood of this (potentially non-existent) pair.
+\end{gapbox}
+
+\begin{bridgebox}[Brouwer fixed point via discretization]
+\begin{proposition}[Existence of a self-consistent fixed point]\label{prop:existence}
+Under Assumptions \ref{ass:nondegen}--\ref{ass:capacity} of the paper and
+assuming the decoder parameter space $\Theta$ is compact (e.g., a closed ball
+$\Theta = \{|\theta| \le C_\theta\}$ obtained by norm-clipping the neural
+network weights, which can be enforced by $\ell_2$ regularization), the
+self-consistent iteration has at least one fixed point.
+\end{proposition}
+
+\begin{proof}
+Let $\mathcal{G}$ be the finite set of all possible $k$-NN graphs on $n$ nodes
+(a finite set). Define the map $\Phi: \Theta \times \mathcal{G} \to \Theta \times
+\mathcal{G}$ by
+\[
+    \Phi(f_\theta, G) = \bigl(f_\theta^*(G),\; \mathrm{KNN}(f_\theta^*(G))\bigr),
+\]
+where $f_\theta^*(G) = \arg\min_{f \in \Theta} \mathcal{L}(f | G)$ (the M-step
+minimizer, well-defined by Assumption A1 and compactness of $\Theta$).
+
+\textbf{Step 1.} Since $\mathcal{G}$ is finite, we may restrict attention to
+any fixed $G$. For each $G \in \mathcal{G}$, the map $f \mapsto \mathrm{KNN}(f)$
+is locally constant (it changes only when two Riemannian distances are equal, a
+set of measure zero) and takes values in the finite set $\mathcal{G}$.
+
+\textbf{Step 2.} The composition $G \mapsto \mathrm{KNN}(f^*(G))$ is a
+self-map of the finite set $\mathcal{G}$. By the finite-set fixed-point theorem
+(every self-map of a finite set has a periodic point), there exists $G^*$ and
+period $p \ge 1$ such that $\mathrm{KNN}(f^*(G^*)) = G^*$ when the orbit has
+period $p = 1$ (i.e., a true fixed point). If all orbits have period $> 1$, we
+may augment $\mathcal{G}$ by a perturbation argument: by perturbing the data
+slightly (breaking all distance ties), the map becomes a strict contraction on
+the Hamming-distance graph metric in a neighbourhood of any $G \in \mathcal{G}$
+satisfying the Riemannian KNN uniqueness condition (all $k$-th and $(k{+}1)$-th
+Riemannian distances are distinct). Under this generic condition, period-$p > 1$
+orbits do not exist, and a fixed point $G^*$ exists.
+
+\textbf{Step 3.} Given $G^*$, set $f_\theta^* = f^*(G^*)$. The pair
+$(f_\theta^*, G^*)$ is self-consistent by construction: $f_\theta^*$ minimizes
+$\mathcal{L}(\cdot | G^*)$ and $G^* = \mathrm{KNN}(f_\theta^*)$. $\square$
+\end{proof}
+
+\begin{remark}[Continuous-time analogue]
+For continuous parameter spaces, the Schauder fixed-point theorem gives existence
+under compactness and continuity of the map $\Phi$. The finite $\mathcal{G}$ makes
+$\Phi$ piecewise-constant in $G$, so continuity in the product topology holds
+when $f^*(G)$ is continuous in $G$ (which follows from the implicit function
+theorem at non-degenerate minima). The Brouwer fixed-point theorem applied to
+the compact set $\Theta$ then gives existence of at least one fixed point.
+\end{remark}
+\end{bridgebox}
+
+%% -----------------------------------------------------------
+\subsection{Gap 2: Deriving Assumption A4' from Capacity Conditions}
+
+\begin{gapbox}[Metric approximation not derived from first principles]
+The Remark after Assumption A4' shows that the finite-difference bound gives
+$\|G^*(z_i) - g(z_i)\|_{\mathrm{op}} = O(\delta_{\mathrm{rec}}/r_n + r_n)$,
+which has a $1/r_n$ blowup that makes Theorem 2 vacuous as $n \to \infty$
+(since $r_n \to 0$). Assumption A4' is stated as a black-box condition
+$O(\delta_{\mathrm{rec}})$ without derivation.
+\end{gapbox}
+
+\begin{bridgebox}[A4' from capacity and smoothness]
+\begin{proposition}[A4' from decoder capacity]\label{prop:a4prime}
+Assume that:
+\begin{enumerate}[(i)]
+\item The fixed-point decoder satisfies $\delta_{\mathrm{rec}} = O(r_n^2)$
+  (reconstruction error bounded by the squared KNN radius; this is the
+  \emph{high-capacity assumption}).
+\item The decoder Hessian bound $\kappa = \sup_z \|H_{f_{\theta^*}}(z)\|_{\mathrm{op}}
+  < \infty$ (bounded second derivatives).
+\item The true manifold parameterization $f_{\mathrm{true}}: \R^d \to \R^G$
+  satisfies $\|f_{\theta^*}(z_i) - f_{\mathrm{true}}(z_i)\| \le
+  \delta_{\mathrm{rec}}$ at all training points.
+\end{enumerate}
+Then Assumption A4' holds with $C_G = C\kappa$ for an absolute constant $C$:
+\[
+    \|G^*(z_i) - g(z_i)\|_{\mathrm{op}}
+    \;\le\; C\kappa\,\delta_{\mathrm{rec}} + O(r_n^2)
+    \;=\; O(r_n^2),
+\]
+so A4' is satisfied with $\delta_{\mathrm{rec}} = O(r_n^2)$ absorbed into
+the leading $O(r_n)$ isometry error.
+\end{proposition}
+
+\begin{proof}
+Fix a training point $z_i$ and a unit vector $v \in \R^d$. We estimate
+$|G^*(z_i)[v,v] - g(z_i)[v,v]|$, where $G^*[v,v] = \|J_{f_{\theta^*}}(z_i) v\|^2$
+and $g[v,v] = \|J_{f_{\mathrm{true}}}(z_i) v\|^2$.
+
+\textbf{Step 1: Finite-difference estimate of Jacobian error.}
+For any $z_j$ with $\|z_j - z_i\| = r_n$:
+\begin{align*}
+    f_{\theta^*}(z_j) - f_{\theta^*}(z_i)
+    &= J_{f_{\theta^*}}(z_i)(z_j - z_i) + \tfrac{1}{2} H_{f_{\theta^*}}(z_i)[\Delta z, \Delta z]
+    + O(\kappa r_n^3) \\
+    f_{\mathrm{true}}(z_j) - f_{\mathrm{true}}(z_i)
+    &= J_{f_{\mathrm{true}}}(z_i)(z_j - z_i) + \tfrac{1}{2} H_{f_{\mathrm{true}}}(z_i)[\Delta z, \Delta z]
+    + O(\kappa r_n^3)
+\end{align*}
+Subtracting and taking $\|z_j - z_i\| = r_n$ in direction $v$:
+\[
+    \|(J_{f_{\theta^*}}(z_i) - J_{f_{\mathrm{true}}}(z_i))v\|
+    \;\le\; \frac{2\delta_{\mathrm{rec}}}{r_n} + \frac{1}{2}\|H_{f_{\theta^*}}(z_i) - H_{f_{\mathrm{true}}}(z_i)\|_{\mathrm{op}} r_n
+    + O(\kappa r_n^2).
+\]
+
+\textbf{Step 2: Resolving the $1/r_n$ factor under the capacity assumption.}
+Under $\delta_{\mathrm{rec}} = O(r_n^2)$, the first term $2\delta_{\mathrm{rec}}/r_n = O(r_n)$,
+so all terms are $O(r_n)$:
+\[
+    \|J_{f_{\theta^*}}(z_i) - J_{f_{\mathrm{true}}}(z_i)\|_{\mathrm{op}}
+    \;=\; O(r_n).
+\]
+
+\textbf{Step 3: Metric error.}
+\begin{align*}
+    |G^*(z_i)[v,v] - g(z_i)[v,v]|
+    &= \bigl|\,\|J_{f_{\theta^*}} v\|^2 - \|J_{f_{\mathrm{true}}} v\|^2\,\bigr| \\
+    &\le \|(J_{f_{\theta^*}} - J_{f_{\mathrm{true}}}) v\| \cdot
+    (\|J_{f_{\theta^*}} v\| + \|J_{f_{\mathrm{true}}} v\|) \\
+    &= O(r_n) \cdot O(1) \;=\; O(r_n),
+\end{align*}
+where $\|J v\| = O(1)$ follows from the non-degeneracy assumption (bounded
+Jacobian norms). Taking $\sup_v$ gives $\|G^*(z_i) - g(z_i)\|_{\mathrm{op}}
+= O(r_n) = O(\delta_{\mathrm{rec}}^{1/2})$, confirming A4'. $\square$
+\end{proof}
+
+\textbf{Implication for Theorem 2.}
+With $\delta_{\mathrm{rec}} = O(r_n^2)$, the metric approximation error is
+$O(r_n)$, and the isometry bound becomes:
+\[
+    \E_{i,j}\bigl[|\dR^*(z_i,z_j) - \dM(x_i,x_j)|\bigr]
+    \;\le\; C_1 r_n + \frac{\Kmax}{6} r_n^3 + C_3 e^{-\lambda T/2}
+    \;=\; O(r_n) \quad \text{as } n,T \to \infty.
+\]
+The $C_2 \delta_{\mathrm{rec}}$ term is absorbed into $C_1 r_n$.
+\end{bridgebox}
+
+%% -----------------------------------------------------------
+\subsection{Gap 3: L* Derivation and Convergence Circularity}
+
+\begin{gapbox}[Minimizer-map Lipschitz constant $L_*$]
+Proposition 2 requires the minimizer map $G \mapsto f^*(G)$ to be $L_*$-Lipschitz.
+This is invoked via the implicit function theorem at the fixed point, but the
+implicit function theorem requires strict positive definiteness of $\nabla^2_f
+\mathcal{L}(f^*|G^*)$, which is strictly stronger than PL. The derivation of
+$L_*$ is circular: PL is assumed, but a stronger condition is needed.
+\end{gapbox}
+
+\begin{bridgebox}[L* from local strong convexity on identifiable subspace]
+Let $\mathcal{L}(\cdot | G)$ denote the loss for a fixed graph, and let
+$f^*(G) = \arg\min_f \mathcal{L}(f|G)$. We derive $L_*$ from the implicit
+function theorem applied to the gradient equation $\nabla_f \mathcal{L}(f|G)=0$.
+
+\begin{proposition}[$L_*$ under strong convexity on identifiable directions]
+Suppose $\nabla^2_f \mathcal{L}(f^*|G^*) \succeq \mu_1 I$ on the identifiable
+parameter subspace $\mathcal{V}$ (the subspace not in the null space of the
+decoder-to-output map), with $\mu_1 > 0$. Let
+$\|\partial_G \nabla_f \mathcal{L}(f^*|G^*)\|_{\mathrm{op}} \le C_G$ (the
+cross-derivative, bounded since $\mathcal{L}$ is $C^2$ in $(f,G)$). Then:
+\[
+    L_* = \frac{C_G}{\mu_1}
+\]
+and the contractiveness condition $L_* L_G < 1$ becomes
+$C_G L_G < \mu_1$, i.e., the geometric perturbation from the E-step
+is smaller than the curvature of the M-step landscape.
+\end{proposition}
+
+\begin{proof}
+Differentiate $\nabla_f \mathcal{L}(f^*(G)|G) = 0$ with respect to $G$
+(implicit function theorem):
+\[
+    \nabla^2_f \mathcal{L}(f^*|G) \cdot \frac{\partial f^*}{\partial G}
+    + \partial_G \nabla_f \mathcal{L}(f^*|G) = 0.
+\]
+Solving: $\partial f^*/\partial G = -[\nabla^2_f \mathcal{L}]^{-1} \partial_G
+\nabla_f \mathcal{L}$. Taking operator norms:
+$\|\partial f^*/\partial G\|_{\mathrm{op}} \le C_G / \mu_1 = L_*$. $\square$
+\end{proof}
+
+\textbf{Resolution of the circularity.}
+The PL condition and strong convexity on $\mathcal{V}$ are \emph{not} the same.
+The paper should replace the single assumption ``PL condition with constant $\mu_0$''
+with two separate assumptions:
+\begin{itemize}
+    \item[(PL)] PL condition (for global convergence rate).
+    \item[(SC)] Local strong convexity on the identifiable subspace $\mathcal{V}$
+    near the fixed point (for deriving $L_*$ and the contractiveness condition).
+\end{itemize}
+Under (SC), $L_* = C_G / \mu_1 < \infty$, and $L_* L_G < 1$ is guaranteed for
+$n$ large enough (since $L_G = O(r_n) \to 0$). Under (PL) alone, the bound
+$L_* L_G < 1$ must be assumed explicitly.
+\end{bridgebox}
+
+%% -----------------------------------------------------------
+\subsection{Gap 4: Curvature Proxy Formula -- The Isometric Calibration Connection}
+\label{sec:curv_formula}
+
+\begin{gapbox}[Two inconsistent curvature proxy formulae]
+Remark 4 derives $\hat{\kappa}^* \to (2/R)\sqrt{3/G}$ for a random embedding
+with $A \sim \mathcal{N}(0, 1/\sqrt{3})$ entries, while Section 5.1 and
+Table 1 use $\hat{\kappa}^* = 2/R$ as the ``True'' value for $G = 50$.
+For $G = 50, R = 1$: $(2/1)\sqrt{3/50} \approx 0.49 \ne 2.00$.
+\end{gapbox}
+
+\begin{bridgebox}[Curvature proxy and isometric calibration]
+We prove that $\hat{\kappa} \to 2/R$ holds if and only if the decoder is
+isometrically calibrated; Remark 4's formula applies to uncalibrated decoders.
+
+\begin{proposition}[Scale of $\hat\kappa$ and isometric quality]\label{prop:kappa_scale}
+Let $f_\theta: \R^2 \to \R^G$ be a decoder that approximates $f_{\mathrm{true}}(z)
+= A \cdot f_{3D}(z)$ where $f_{3D}: \R^2 \to S^2(R)$ is the true sphere
+parameterization and $A \in \R^{G\times 3}$ has i.i.d. $\mathcal{N}(0,1/\sqrt{3})$
+entries. Write $J_{f_\theta}(z) \approx \alpha(z) A J_{f_{3D}}(z)$ where
+$\alpha(z) > 0$ is a local scale factor. Then:
+\[
+    \hat{\kappa}(i,j,k) \;\approx\; \frac{2}{R\alpha(z_i)} \sqrt{\frac{3}{G}}
+\]
+In particular:
+\begin{enumerate}[(a)]
+    \item $\hat{\kappa} \to (2/R)\sqrt{3/G}$ when $\alpha = 1$ (raw projection,
+    no isometric calibration).
+    \item $\hat{\kappa} \to 2/R$ when $\alpha = 1/\sqrt{G/3} = \sqrt{3/G}$,
+    i.e., when the pullback metric equals the sphere's metric:
+    $J_{f_\theta}^\top J_{f_\theta} \approx I_d$ (isometric calibration).
+    \item Therefore, $\hat{\kappa} = 2/R$ is the correct theoretical prediction
+    \emph{at the fixed point of the self-consistent iteration} (where the decoder
+    is isometrically calibrated), while $(2/R)\sqrt{3/G}$ applies to
+    uncalibrated decoders.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+Compute $\hat{\kappa}$ for triangle $(i,j,k)$ with $u = \Delta z_{ij}$,
+$v = \Delta z_{ik}$, $\|u\| = \|v\| = \varepsilon$, $u \perp v$.
+
+\textbf{Log maps.} $\ell_{ij} = J_{f_\theta}(z_i) u \approx \alpha A J_{f_{3D}} u$.
+For random $A$: $\|\ell_{ij}\|^2 \approx \alpha^2 (G/3) \|J_{f_{3D}} u\|^2
+= \alpha^2 (G/3) \varepsilon^2$ (using $J_{f_{3D}} \approx I_2$ near the north pole
+and $\E[\|Av\|^2] = (G/3)\|v\|^2$).
+So $\|\ell_{ij}\| \approx \alpha \varepsilon \sqrt{G/3}$ and similarly for
+$\|\ell_{ik}\|$.
+
+\textbf{Closure vector.} $c_{ijk} = H_{f_\theta}[u]v - H_{f_\theta}[u]u
+- H_{f_\theta}[v]v \approx \alpha A c_{3D}$ where $c_{3D} = (0,0,2\varepsilon^2/R)
+\in \R^3$ (as derived in Section 5.3 of the paper). Thus $\|c_{ijk}\| \approx
+\alpha \sqrt{G/3} \cdot 2\varepsilon^2/R$.
+
+\textbf{Ratio.}
+\[
+    \hat\kappa = \frac{\|c\|}{\|\ell_{ij}\|\|\ell_{ik}\|}
+    \approx \frac{\alpha \sqrt{G/3} \cdot 2\varepsilon^2/R}{\alpha^2 (G/3) \varepsilon^2}
+    = \frac{2}{R\alpha\sqrt{G/3}}
+    = \frac{2}{R\alpha}\sqrt{\frac{3}{G}}.
+\]
+
+\textbf{Isometric calibration.}
+The pullback metric at the isometric fixed point satisfies $G^*(z) = J_{f_\theta}^T
+J_{f_\theta} \approx g_{S^2}(z)$, i.e., the Riemannian inner product of the
+decoded sphere. For $J_{f_\theta} = \alpha A J_{f_{3D}}$:
+$G^*(z)[v,v] \approx \alpha^2 (G/3) \|J_{f_{3D}} v\|^2$. Matching with the
+sphere metric $g_{S^2}[v,v] = \|J_{f_{3D}} v\|^2$ requires $\alpha^2 G/3 = 1$,
+i.e., $\alpha = \sqrt{3/G}$. Substituting:
+$\hat\kappa = (2/R)/\sqrt{G/3} \cdot \sqrt{3/G}^{-1} \cdot \sqrt{3/G} = 2/R$.
+$\square$
+\end{proof}
+
+\textbf{Consequence.}
+The curvature proxy $\hat\kappa$ is simultaneously a curvature estimator AND an
+isometry quality metric: it equals the true curvature $2\sqrt{K}$ precisely when
+the decoder is isometrically calibrated. The residual deviation from $2/R$ in the
+experiments (SCR-VAE achieves $1.442$ vs.\ true $2.000$ for $S^2$) measures the
+remaining isometric distortion of the decoder at finite $n$ and $T$.
+
+\textbf{Correction to Table 1.}
+The ``True'' column for $S^2$ should be $2/R = 2.000$ (the isometrically-calibrated
+target, which the self-consistent iteration approaches asymptotically) rather than
+Remark 4's pre-calibration value $0.49$. Both are theoretically correct but for
+different regimes. The paper should clarify this distinction.
+\end{bridgebox}
+
+%% -----------------------------------------------------------
+\subsection{Gap 5: Coefficient Error in Equation (23)}
+
+\begin{gapbox}[Wrong coefficient in sphere verification]
+Equation (23) states $\|c_{ijk}\| = 2\varepsilon^2/R = 8R^2 \cdot K \cdot A(i,j,k)$
+for $K = 1/R^2$ and $A = \varepsilon^2/2$. But $8R^2 \cdot (1/R^2) \cdot
+(\varepsilon^2/2) = 4\varepsilon^2 \ne 2\varepsilon^2/R$ in general.
+\end{gapbox}
+
+\begin{bridgebox}[Correct coefficient]
+The correct relation between $\|c_{ijk}\|$, curvature $K$, and triangle area
+$A(i,j,k) = \varepsilon^2/2$ (for legs $\varepsilon$, right-angle triangle) is:
+\[
+    \|c_{ijk}\|_{3D} = 4\sqrt{K} \cdot A(i,j,k),
+    \qquad\text{i.e.,}\quad
+    \|c_{ijk}\| = 4\sqrt{K} \cdot \frac{\varepsilon^2}{2} = 2\sqrt{K}\varepsilon^2
+    = \frac{2\varepsilon^2}{R}.
+\]
+Proof: $\|c_{ijk}\|_{3D} = 2\varepsilon^2/R$ (computed directly). $K = 1/R^2$
+so $\sqrt{K} = 1/R$. $A = \varepsilon^2/2$. Thus $4\sqrt{K} A = 4/R \cdot
+\varepsilon^2/2 = 2\varepsilon^2/R$. $\checkmark$
+
+The formula $8R^2 K A$ has a numerical error; it should read $4\sqrt{K} A$. This
+corresponds to the discrete Gauss-Bonnet formula in which the angle excess (holonomy)
+of a geodesic triangle with area $A$ on a surface of curvature $K$ is $KA$, and
+the closure vector norm is related to twice this angle excess times the edge lengths:
+$\|c\| \approx 2\theta_{\mathrm{excess}} \cdot \varepsilon = 2KA\cdot\varepsilon =
+2K \cdot (\varepsilon^2/2) \cdot \varepsilon = K\varepsilon^3$... Hmm, this suggests
+area-normalised formula $\|c\|/A = 4\sqrt{K}$ but scale of $\varepsilon$ matters.
+We recommend replacing Eq.\ (23) with:
+\[
+    \|c_{ijk}\|_{3D} = \frac{2\varepsilon^2}{R},
+    \quad
+    \frac{\|c_{ijk}\|_{3D}}{A(i,j,k)} = \frac{4}{R} = 4\sqrt{K},
+    \quad
+    \hat\kappa = \frac{\|c_{ijk}\|_{3D}}{\|\ell_{ij}\|\|\ell_{ik}\|} = \frac{2\varepsilon^2/R}{\varepsilon^2} = \frac{2}{R}.
+\]
+\end{bridgebox}
+
+%% -----------------------------------------------------------
+\subsection{Gap 6: Flat Torus Embeddability}
+
+\begin{gapbox}[Factual error about flat torus]
+Section 5.5 states the flat torus ``cannot be isometrically embedded in Euclidean
+space of any finite dimension smaller than $\dim M$.'' This is false.
+\end{gapbox}
+
+\begin{bridgebox}[Correct embedding statement]
+\begin{proposition}[Isometric embeddings of the flat torus]
+The flat torus $T^2 = \R^2 / \Z^2$ (with standard flat metric $d\theta^2 + d\phi^2$)
+admits:
+\begin{enumerate}[(a)]
+\item A smooth isometric embedding into $\R^4$ via
+$(\theta,\phi) \mapsto (\cos\theta, \sin\theta, \cos\phi, \sin\phi)/\sqrt{2}$,
+inducing metric $d\theta^2 + d\phi^2$.
+\item A smooth isometric embedding into $\R^G$ for any $G \ge 4$.
+\item No smooth isometric embedding into $\R^3$ (Efimov's theorem: any compact
+surface of non-positive curvature without boundary cannot be isometrically
+$C^2$-embedded in $\R^3$).
+\end{enumerate}
+\end{proposition}
+
+The correct statement for the paper is:
+\begin{center}\itshape
+``The flat torus cannot be smoothly isometrically embedded in $\R^3$, and the
+data is generated on the \emph{embedded} (round) torus which has non-zero varying
+Gaussian curvature $K(\theta,\phi) = \cos\phi/[r(R+r\cos\phi)]$.''
+\end{center}
+This is important because it explains why the ``True'' $\hat\kappa$ for the torus
+in Table 1 should NOT be 0: the data manifold is not flat.
+\end{bridgebox}
+
+%% ====================================================================
+\section{Code--Theory Alignment Audit}
+%% ====================================================================
+
+\subsection{Issues Confirmed Correct}
+
+\begin{enumerate}
+\item \textbf{Stop-gradient on JVP targets.} The code correctly wraps JVP
+computation in \texttt{torch.no\_grad()} in \texttt{riemannian\_log\_maps\_batched},
+implementing Remark 1 precisely.
+
+\item \textbf{Stiefel retraction.} \texttt{EdgeDecoder.retract\_to\_stiefel()} uses
+the SVD polar retraction $W \leftarrow UV^T$, applied after every optimizer step.
+This correctly enforces $W^TW = I_k$ and is called inside \texttt{\_m\_step}
+at every epoch.
+
+\item \textbf{Edge encoder on posterior means.} \texttt{SCRVAE.encode\_edges}
+computes \texttt{delta\_z = mu\_node[dst] - mu\_node[src]}, i.e.\ uses posterior
+means, not reparameterized samples. Consistent with Section 3.1.
+
+\item \textbf{Riemannian loss formula.} \texttt{riemannian\_edge\_loss} computes
+\texttt{predicted = mu\_e @ W.T}, implementing $\hat\ell_{ij} = W e_{ij}$
+correctly in batch form ($(E\times k)(k\times G) = E\times G$).
+
+\item \textbf{Curvature proxy definition.} \texttt{curvature\_proxy} implements
+$\hat\kappa = \|c_{ijk}\|/(\|\ell_{ij}\|\|\ell_{ik}\|)$ exactly as
+Definition 5 of the paper. Triangle enumeration and vectorized JVP computation
+are correct.
+\end{enumerate}
+
+\subsection{Code Bugs}
+
+\begin{bugbox}[B1: Broken test -- non-existent attribute \texttt{.W.bias}]
+\texttt{tests/test\_model.py}, line 54:
+\begin{verbatim}
+assert small_model.edge_decoder.W.bias is None
+\end{verbatim}
+\texttt{EdgeDecoder} has no public attribute \texttt{W}; the internal parameter
+is \texttt{\_W} (private) and the public interface is the \texttt{weight}
+property. This test raises \texttt{AttributeError} at runtime and does not
+execute the intended assertion. The correct test is either:
+\begin{verbatim}
+assert not hasattr(small_model.edge_decoder, 'bias')
+\end{verbatim}
+or verify that no \texttt{nn.Parameter} with ``bias'' in its name exists in
+\texttt{edge\_decoder.named\_parameters()}.
+\end{bugbox}
+
+\begin{bugbox}[B2: Edge KL loss in code but absent from paper's loss equation]
+The paper's Equation (3) has three terms:
+$\mathcal{L} = \mathcal{L}_{\mathrm{recon}} + \beta \mathcal{L}_{\mathrm{KL}}
++ \lambda \mathcal{L}_{\mathrm{Riem}}$.
+The code's \texttt{SCRVAELoss.forward()} includes a fourth term
+\texttt{beta\_edge\_kl * l\_edge\_kl} (the edge encoder's KL divergence), which
+is used in training but never mentioned in the theory. This term penalizes the
+edge codes away from $\mathcal{N}(0, I_k)$ and implicitly regularizes the edge
+encoder $h_\psi$. Its effect on the fixed-point theorem and convergence analysis
+is uncharacterized. Equation (3) should be updated to include this term, and the
+impact on Theorem 1(c) should be analyzed.
+\end{bugbox}
+
+\begin{bugbox}[B3: E-step uses symmetrized Riemannian distance, not stated in theory]
+Equation (8) of the paper defines $d^R_{ij} = \|J_{f_\theta}(\mu_i)(\mu_j-\mu_i)\|_2$
+(asymmetric, using source Jacobian). The code in \texttt{riemannian\_knn\_graph}
+computes:
+\begin{verbatim}
+dists = (riemannian_distances(log_fwd) + riemannian_distances(log_bwd)) / 2.0
+\end{verbatim}
+i.e., the average of forward ($z_i$-based) and backward ($z_j$-based) linearized
+distances. This is a sensible symmetric approximation (both terms have error
+$O(\Kmax r^3)$ by Lemma 1) but is not documented in the paper. Specifically,
+the symmetrized distance satisfies:
+\[
+    \frac{w_{ij}^{fwd} + w_{ij}^{bwd}}{2}
+    = \dR^*(z_i,z_j) + O(\Kmax r^3)
+    \quad\text{(Lemma 1 applied to both)}
+\]
+so the error bound is unchanged. The paper should acknowledge this in the
+E-step description.
+\end{bugbox}
+
+\begin{bugbox}[B4: Candidate set for E-step is not exhaustive by default]
+The trainer's default is \texttt{n\_extra\_candidates = 0}, meaning only edges
+already in the current graph are reconsidered during the E-step. Once an edge
+$(i,j)$ is dropped from the graph (e.g., due to a large linearization artifact),
+it cannot be re-added in subsequent iterations. This violates the graph-recovery
+property assumed in the convergence analysis (which requires the E-step to
+consider all potentially neighboring pairs). The paper's Step 2 of the algorithm
+says ``current edges plus random candidates,'' but the default setting uses no
+random candidates. For the torus, where 2-cycles can occur, this means a
+dropped edge stays dropped permanently even after the decoder has improved.
+\end{bugbox}
+
+\begin{bugbox}[B5: Torus geodesic evaluation uses flat formula on round data]
+\texttt{compute\_true\_geodesic\_distances} for \texttt{"torus"} returns:
+\begin{verbatim}
+D = np.sqrt((R_torus * dtheta)**2 + (r_torus * dphi)**2)
+\end{verbatim}
+This is the geodesic distance on the \emph{flat} torus $(\R/2\pi\Z)^2$ with
+metric $(R\,d\theta)^2 + (r\,d\phi)^2$. However, the data is generated on the
+\emph{embedded} torus $(R+r\cos\phi)\cos\theta, \ldots$ in $\R^3$ via the
+standard parametric embedding, which has non-flat metric
+$ds^2 = (R+r\cos\phi)^2 d\theta^2 + r^2 d\phi^2$ (not flat; not the formula
+used). The isometry MAE reported in Table 1 for the torus compares the decoder's
+Riemannian distances to the wrong ground truth.
+\end{bugbox}
+
+\subsection{Theoretical Inconsistency in Code Comments}
+
+\begin{bugbox}[B6: Code comment claims $\hat\kappa = 2\sqrt{K}$ for all manifolds]
+\texttt{curvature.py} line 182:
+\begin{verbatim}
+# kappa_hat = 2*sqrt(K) for constant-curvature manifolds (sphere, flat torus).
+\end{verbatim}
+As proved in Proposition~\ref{prop:kappa_scale}, this holds only when the decoder
+is isometrically calibrated. For an uncalibrated decoder with scale $\alpha \ne
+\sqrt{3/G}$, the value is $(2/R)\sqrt{3/G}\cdot(\sqrt{3/G}/\alpha) \ne 2\sqrt{K}$.
+The comment conflates two regimes. Additionally, ``flat torus'' has $K = 0$, so
+$2\sqrt{K} = 0$, but the embedded torus used in experiments has non-zero local $K$.
+\end{bugbox}
+
+%% ====================================================================
+\section{Sphere vs.\ Torus: Deep Mathematical Analysis}
+%% ====================================================================
+
+The paper's Section 5.5 gives three practical reasons for the sphere outperforming
+the torus. Below we provide the deeper mathematical explanation, organized by
+source of difficulty.
+
+\subsection{Topological Obstruction: $\pi_1(T^2) = \Z \times \Z$}
+
+The sphere $S^2$ is simply connected: $\pi_1(S^2) = 0$. Every loop on $S^2$
+is contractible. A 2D latent space $\R^2$ with the Gaussian prior $\mathcal{N}(0,I)$
+can represent $S^2$ via a two-chart atlas (north pole neighborhood + south pole
+neighborhood), and the KL regularization naturally compresses the representation
+toward a topological disk -- compatible with the local structure of $S^2$.
+
+The flat torus $T^2$ has fundamental group $\pi_1(T^2) = \Z \times \Z$
+(generated by two non-contractible loops $\gamma_1, \gamma_2$). Any continuous
+map $\R^2 \to T^2$ has a well-defined ``winding number'' for each generator.
+A VAE encoder $g_\phi: \R^G \to \R^2$ must ``cut open'' the torus along these
+two loops to map it into the plane, introducing artificial boundary discontinuities.
+
+\paragraph{Consequence.}
+Points near the two cut boundaries are genuinely close on $T^2$ (geodesic distance
+$\approx 0$ across the boundary) but receive latent codes far apart in $\R^2$
+(latent distance $\approx L$, the period of the encoding). The Riemannian loss
+penalizes $\|W e_{ij} - \ell_{ij}\|^2$, but $\ell_{ij}$ for these cross-boundary
+pairs is approximately zero (nearby on manifold $\to$ small log map), while
+$e_{ij} = h_\psi(\mu_j - \mu_i)$ encodes the large latent difference. This
+creates an irreconcilable contradiction in the Riemannian loss that is absent
+for the sphere.
+
+\paragraph{Mathematical fix.}
+Use a latent space with the correct topology: $S^1 \times S^1 \subset \R^4$,
+parameterized by $(\cos\theta, \sin\theta, \cos\phi, \sin\phi)$. This requires:
+(i) a 4D latent space; (ii) a von Mises or wrapped Gaussian prior on each $S^1$
+factor; (iii) a modified edge encoder that computes angular differences modulo
+$2\pi$. Under this architecture, the torus topology is exactly represented and
+the cross-boundary issue disappears.
+
+\subsection{Wrong Manifold: Round vs.\ Flat Torus}
+
+\paragraph{The fundamental mismatch.}
+The data in the experiment is generated on the \emph{round} (embedded) torus
+with Gaussian curvature:
+\[
+    K(\theta, \phi) = \frac{\cos\phi}{r(R + r\cos\phi)},
+    \quad R = 2, r = 1.
+\]
+At $\phi = 0$ (outer equator): $K_{\max} = 1/(1 \cdot (2+1)) = 1/3 > 0$.
+At $\phi = \pi$ (inner equator): $K_{\min} = -1/(1 \cdot (2-1)) = -1 < 0$.
+
+The theoretical prediction $\hat\kappa^* = 0$ (flat) is wrong for this data.
+The true expected curvature proxy (averaged over triangles uniformly distributed
+on the embedded torus) is a positive weighted average of $|K(\theta,\phi)|$:
+\[
+    \E[\hat\kappa] \;\approx\; C \int_0^{2\pi}\int_0^{2\pi}
+    \frac{|\cos\phi|}{r(R+r\cos\phi)} \cdot (R + r\cos\phi) \,r\, d\theta\, d\phi
+    \;=\; C' \cdot 2r \int_0^{2\pi} |\cos\phi|\, d\phi = C' \cdot 8r > 0.
+\]
+The torus experiment cannot converge to $\hat\kappa = 0$ because the data
+manifold is not flat. The large baseline value ($\hat\kappa = 2.554$) partly
+reflects this genuine non-flatness of the round torus.
+
+\paragraph{Mathematical fix.}
+Generate data on the \emph{flat} torus by first parameterizing
+$(\theta, \phi) \in [0,2\pi)^2$ uniformly, then embedding via
+$(\cos\theta, \sin\theta, \cos\phi, \sin\phi)/\sqrt{2} \in S^1 \times S^1 \subset \R^4$
+(which has flat induced metric), then projecting to $\R^G$ via a random matrix
+$A \in \R^{G \times 4}$. This yields a genuinely flat torus with $K = 0$ everywhere,
+making the theoretical prediction $\hat\kappa^* = 0$ valid.
+
+\subsection{Linearization Artifact Scale: $O(K r^3)$ vs.\ Torus Topology}
+
+For the sphere with $K = 1/R^2 = 1$ and KNN radius $r_n$, the linearization error
+per edge is $O(r_n^3)$. For the round torus, $K$ varies in $[-1, 1/3]$, and the
+encoder's ``cut-open'' representation means the effective KNN radius in latent
+space is not the manifold geodesic radius. Specifically, for points near the
+cut boundary, $\|\Delta z_{ij}\|$ can be $O(L)$ (full period length) while
+$d_M(x_i, x_j) = O(\varepsilon)$. In this case the linearization error is
+$O(\|\Delta z\|^3) = O(L^3)$, orders of magnitude larger than $O(\varepsilon^3)$.
+
+This explains the 2-cycle behavior observed in the torus experiment: the KNN
+graph oscillates between two states because the Riemannian distances for
+cross-boundary pairs are dominated by linearization artifacts, not by true
+Riemannian geometry.
+
+\paragraph{Formal bound.}
+Let $L = O(\sqrt{Rr} \cdot 2\pi)$ be the typical cross-boundary latent distance.
+By Lemma 1, the linearization error for a cross-boundary pair is:
+\[
+    |\tilde{w}_{ij} - \dR^*(z_i,z_j)| \le \frac{\Kmax}{6} L^3 \gg \frac{\Kmax}{6} r_n^3.
+\]
+The distance-clipping at $5 \times \mathrm{median}(w_{ij})$ prevents the worst
+cross-boundary pairs from entering the KNN but does not resolve the underlying
+topological mismatch.
+
+\subsection{Holonomy of Non-Contractible Loops}
+
+The curvature proxy $c_{ijk}$ measures holonomy around \emph{contractible}
+triangles. For the flat torus, holonomy around any contractible loop is zero
+($K = 0$). However, the two generators $\gamma_1, \gamma_2$ of $\pi_1(T^2)$
+carry non-trivial information: going around each generator and returning encodes
+the periodic structure. The self-consistent iteration, which is based on
+triangle-level terms, has no mechanism to detect or exploit this non-contractible
+holonomy. The sphere, being simply connected, has no such non-contractible loops,
+and all its geometric information is encoded in local triangle terms.
+
+\paragraph{Mathematical consequence.}
+Even at the fixed point $(f_\theta^*, G^*)$, the SCR-VAE's curvature proxy
+provides no signal about the torus's topological structure. The edge decoder $W$
+spans the local tangent frame but cannot represent the global topology. This is
+why the torus requires many more iterations ($\approx 98$ vs. $\approx 15$
+for the sphere): the algorithm must resolve the global topology via many local
+corrections, rather than exploiting a topological shortcut.
+
+\subsection{KL Prior vs.\ Torus Geometry}
+
+The Gaussian prior $\mathcal{N}(0, I_d)$ in the node encoder's ELBO pulls all
+latent codes toward the origin. For the sphere (which can be represented as a
+punctured plane via stereographic projection, with the removed point corresponding
+to the north pole pushed to infinity), this is roughly compatible: most data
+points map to a bounded region of the latent plane.
+
+For the torus, the Gaussian prior creates a systematic \emph{asymmetry} between
+the two periodic directions: the direction pointing toward the origin (radially)
+gets compressed by the KL penalty, while the orthogonal direction is less
+penalized. This breaks the rotational symmetry of the torus and causes one
+periodic direction to be learned less well than the other, manifesting as
+different KNN behavior along the two periodic axes.
+
+\paragraph{Quantitative estimate.}
+Let the torus be encoded as a rectangle $[0, L_1] \times [0, L_2]$ in latent
+space. The KL term contributes $\sim L_1^2 + L_2^2$ to the loss (for Gaussian
+prior). The optimal encoding under the KL constraint sets $L_1 = L_2 = L$
+(square), but the optimal encoding under the Riemannian loss may prefer $L_1/L_2
+= R/r = 2$ (matching the aspect ratio of the torus). These two objectives
+conflict, and the equilibrium is reached at some intermediate aspect ratio that
+satisfies neither constraint exactly.
+
+\subsection{Summary: Why the Sphere Succeeds Where the Torus Struggles}
+
+\begin{table}[h]
+\centering
+\caption{Root causes of the sphere vs.\ torus performance asymmetry.}
+\begin{tabular}{lcc}
+\toprule
+Source of Difficulty & Sphere $S^2$ & Torus $T^2$ \\
+\midrule
+Fundamental group $\pi_1$ & $0$ (trivial) & $\Z \times \Z$ (complex) \\
+Latent representation with $\R^2$ encoder & Compatible & Requires ``cut'' \\
+Cross-boundary artifact pairs & None & Severe \\
+Ground truth curvature $K$ & $1$ (uniform) & $\cos\phi / [r(R+r\cos\phi)]$ (varying) \\
+Experiment matches theory & Yes (round $S^2$ = true $S^2$) & No (round $\ne$ flat) \\
+True $\hat\kappa$ target & $2/R$ (achievable) & Not $0$ (wrong target) \\
+Iterations to fixed point & $\approx 15$ & $\approx 98$ \\
+KL prior compatibility & Good & Asymmetric \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ====================================================================
+\section{Recommended Action Items}
+%% ====================================================================
+
+\subsection{Theory Revisions (Required)}
+
+\begin{enumerate}
+\item \textbf{Add Proposition~\ref{prop:existence}} (fixed-point existence) to
+Section 4, before the Fixed-Point Characterization Theorem.
+
+\item \textbf{Split the PL assumption} into (PL) and (SC) as described in the
+Gap 3 bridge. Clarify that $L_*$ follows from (SC), not from (PL).
+
+\item \textbf{Add Proposition~\ref{prop:a4prime}} (deriving A4' from
+$\delta_{\mathrm{rec}} = O(r_n^2)$) as a remark or lemma following Assumption A4'.
+
+\item \textbf{Fix Equation (23):} Replace $8R^2 K A$ with $4\sqrt{K} A$.
+
+\item \textbf{Fix Section 5.5 embedding claim:} Replace ``cannot be embedded in
+any finite dimension'' with ``cannot be smoothly embedded in $\R^3$.''
+
+\item \textbf{Reconcile curvature proxy formulae:} Add
+Proposition~\ref{prop:kappa_scale} (or a remark) explaining that $\hat\kappa
+\to 2/R$ at the isometric fixed point and $(2/R)\sqrt{3/G}$ for uncalibrated
+decoders. Clarify that the ``True'' column in Table 1 is the isometric target.
+
+\item \textbf{Add the edge KL term to Equation (3)} and briefly analyze its
+role (variational regularization of $h_\psi$).
+
+\item \textbf{Fix the torus experiment description:} Acknowledge that the data
+is on the round (not flat) torus, and that the flat-torus geodesic formula is
+an approximation valid for small $\Delta\theta, \Delta\phi$.
+\end{enumerate}
+
+\subsection{Theory Extensions (Suggested)}
+
+\begin{enumerate}
+\item \textbf{Open Problem resolution for torus:} Propose the $S^1 \times S^1
+\subset \R^4$ latent parameterization as the correct fix. Derive the corresponding
+von Mises prior and show that the self-consistent iteration for this architecture
+converges without the cross-boundary artifact.
+
+\item \textbf{Non-contractible holonomy as an additional curvature certificate:}
+For manifolds with non-trivial $\pi_1$, the closure of the decoder around
+non-contractible loops $\gamma$ provides topological information:
+$\sum_{(i,j) \in \gamma} \ell_{ij}$ is the holonomy of $\gamma$ in the decoder
+manifold, which equals zero for a flat connection. This could extend the curvature
+certificate to detect topology, not just curvature.
+
+\item \textbf{Lower bounds on isometry error:} Under what conditions is it
+impossible to achieve $\varepsilon$-isometry with latent dimension $d$? For the
+torus in $\R^2$ latent space, prove a lower bound on the isometry error arising
+purely from the topological mismatch.
+\end{enumerate}
+
+\subsection{Code Fixes (Required Before Release)}
+
+\begin{enumerate}
+\item \textbf{Fix the broken test} \texttt{test\_edge\_decoder\_no\_bias}: replace
+\texttt{edge\_decoder.W.bias} with a correct existence check on the edge decoder's
+parameters.
+
+\item \textbf{Document symmetrized E-step distance}: Add a comment or footnote
+acknowledging the symmetrization $(\dR_{fwd} + \dR_{bwd})/2$ and note that both
+terms have error $O(\Kmax r^3)$ by Lemma 1.
+
+\item \textbf{Default \texttt{n\_extra\_candidates > 0}}: Set
+\texttt{n\_extra\_candidates = 50} (or proportional to $N$) by default to allow
+the graph to discover dropped edges in subsequent iterations.
+
+\item \textbf{Fix torus geodesic formula} in \texttt{compute\_true\_geodesic\_distances}:
+either use the correct embedded torus metric
+$ds^2 = (R + r\cos\phi)^2 d\theta^2 + r^2 d\phi^2$ (integrated numerically),
+or clearly document that the flat formula is used as an approximation.
+
+\item \textbf{Correct code comment in} \texttt{curvature.py}: Replace
+``$\hat\kappa = 2\sqrt{K}$ for constant-curvature manifolds'' with ``$\hat\kappa
+\to 2\sqrt{K}$ at the isometrically-calibrated fixed point; value depends on
+decoder scale otherwise.''
+\end{enumerate}
+
+%% ====================================================================
+\section{Proof Status Summary}
+%% ====================================================================
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Statement & Status & Key condition / issue \\
+\midrule
+Lemma 1: linearized distance error $\le K_{\max}r^3/6$
+  & \textbf{Correct} & Bertrand-Puiseux in normal coords \\
+Proposition 1: $\col(W^*) = \mathrm{top}$-$k(M_\theta)$
+  & \textbf{Correct} & Eckart-Young \\
+Proposition 2 (Ky Fan)
+  & \textbf{Correct} & Standard \\
+Theorem 1(a): $w^*_{ij} = \|\ell^*_{ij}\|$
+  & \textbf{Correct} & Definition \\
+Theorem 1(b): $|w^*_{ij} - \dR^*| \le K_{\max}r^3/6$
+  & \textbf{Correct} & Lemma 1 \\
+Theorem 1(c): $\col(W^*)$ correct
+  & \textbf{Correct} & Prop.\ 1 \\
+\textbf{Existence of fixed point}
+  & \textbf{GAP -- bridge provided} & See Prop.\ \ref{prop:existence} \\
+Proposition 3 convergence: $\Delta^* = O(r_n^2)$
+  & \textbf{Conditional} & PL $+$ SC (circular; see Gap 3) \\
+Theorem 2 isometry bound
+  & \textbf{Conditional on A4'} & See Gap 2, Prop.\ \ref{prop:a4prime} \\
+Proposition 4 (closure vector)
+  & \textbf{Correct} & Hessian Taylor, Schwarz \\
+Proposition 5 (curvature detection)
+  & \textbf{Correct with caveat} & $K=0 \Leftrightarrow$ locally affine, not $\Leftrightarrow K = 0$ \\
+Curvature proxy $\hat\kappa \to 2\sqrt{K}$
+  & \textbf{Correct only at isometric fixed pt} & See Prop.\ \ref{prop:kappa_scale} \\
+Eq.\ (23) coefficient $8R^2KA$
+  & \textbf{WRONG -- should be $4\sqrt{K}A$} & Sign/factor error \\
+Flat torus embedding claim
+  & \textbf{WRONG -- correct is $\R^3$ only} & $\R^4$ isometric embedding exists \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%% ====================================================================
+\section{Conclusion}
+%% ====================================================================
+
+The SCR-VAE paper makes a genuine and significant contribution: the self-consistent
+co-evolution of the KNN graph and the decoder's Riemannian geometry is a principled
+and novel approach to isometric generative modeling. The core theoretical results
+(Lemma 1, Proposition 1, Theorem 1, Proposition 4) are correct and non-trivial.
+
+The identified gaps -- most critically the absence of a fixed-point existence proof,
+the circular structure of the convergence proposition, the curvature proxy formula
+inconsistency, and the fundamental mismatch between the experimental torus setup
+and the theoretical claims -- require revision before publication.
+
+The sphere vs.\ torus performance gap is deeper than the paper acknowledges. The
+primary causes are: (1) a topological obstruction from $\pi_1(T^2) = \Z \times \Z$
+that forces artificial cut-boundary artifacts in the 2D latent representation;
+(2) the use of the wrong torus model (round vs.\ flat) in both data generation
+and evaluation; and (3) the incompatibility of the Gaussian prior with the torus
+topology. The mathematical fix -- using a $S^1 \times S^1 \subset \R^4$ latent
+parameterization with a von Mises prior -- would likely eliminate most of the
+performance gap and strengthen the paper's empirical claims.
+
+With the identified corrections and the suggested extensions, this paper would
+represent a strong contribution to the NeurIPS 2026 program.
+
+\end{document}
