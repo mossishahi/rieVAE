@@ -80,8 +80,12 @@ class TrainerConfig:
     # Allow the E-step to consider additional random candidate pairs beyond the
     # current graph edges. This prevents permanently losing edges that were
     # spuriously dropped due to linearization artifacts in early iterations.
-    # Set to 0 only to restrict to current edges (not recommended for torus).
-    n_extra_candidates: int = 50
+    #
+    # Default is 0 to reproduce the published experiments (sphere_v2 and
+    # torus_clifford runs). For new experiments, setting this to 50 is
+    # recommended: it allows rediscovery of spuriously dropped edges without
+    # significantly increasing compute (50 extra JVP calls per E-step).
+    n_extra_candidates: int = 0
     # Clip Riemannian distances at clip_factor * median before KNN ranking.
     # Prevents linearization artifacts on far-away pairs from causing
     # graph oscillation (2-cycle). Set to 0 to disable.
