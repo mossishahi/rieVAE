@@ -6,8 +6,11 @@ by the Jacobian-vector product:
     l_ij = J_{f_theta}(z_i) @ (z_j - z_i)  in R^G
 
 This is the first-order Taylor approximation of f_theta(z_j) - f_theta(z_i),
-exact when f_theta is linear (Corollary 1 of the theory paper), and bounded by
-(K_max / 6) * ||Delta z||^3 otherwise (Lemma 1).
+exact when f_theta is linear (Corollary 1 of the theory paper). The approximation
+error is O(||Gamma(z_i)|| * r^2) + O(K_max * r^3) in general (Lemma 1), where
+Gamma(z_i) are the Christoffel symbols of the pullback metric in Euclidean latent
+coordinates. The error reduces to O(K_max * r^3 / 6) when G(z_i) = I (e.g., at
+the isometric fixed point in near-normal coordinates).
 
 All computations use STOP-GRADIENT on f_theta: the decoder does not receive
 gradient from the Riemannian loss. Gradient flows only from L_node_recon and
@@ -99,7 +102,10 @@ def riemannian_distances(log_maps: torch.Tensor) -> torch.Tensor:
     """Compute Riemannian distances w_ij = ||l_ij||_2 from log maps.
 
     These distances are used as edge weights in the Riemannian KNN graph.
-    By Lemma 1 of the theory paper, |w_ij - d_R(z_i, z_j)| <= K_max * r^3 / 6.
+    By Lemma 1 of the theory paper:
+        |w_ij - d_R(z_i, z_j)| <= C_Gamma(z_i) * r^2 + K_max * r^3 / 6
+    where C_Gamma = ||Gamma^{Eucl}(z_i)|| is the Christoffel-symbol norm at z_i.
+    The O(K r^3/6) bound holds exactly when G(z_i) = I (near-normal coordinates).
 
     Parameters
     ----------
