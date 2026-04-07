@@ -10,6 +10,12 @@ build/
 # Paper text lives in a separate repo (rieVAE_text)
 docs/
 
+# Internal review documents
+reviews/
+
+# Tests (internal only)
+tests/
+
 # SLURM job outputs
 slurm_*.job
 
