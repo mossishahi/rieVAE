@@ -213,7 +213,11 @@ def _deduplicate_edges(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Remove duplicate directed edges, keeping the minimum-weight copy."""
     src, dst = edge_index[0], edge_index[1]
-    keys = src * (src.max().item() + dst.max().item() + 2) + dst
+    # Hash: key = src * stride + dst.  stride = src_max + dst_max + 2 ensures
+    # injectivity (key(s,d) != key(s',d') whenever (s,d) != (s',d')).
+    # For N=3000: max_key ~ 3000 * 6002 ~ 18M, well within int64.
+    # For N > ~3M the product could approach int64 limits; use torch.int64 below.
+    keys = src.long() * (src.max().item() + dst.max().item() + 2) + dst.long()
     unique_keys, inverse = torch.unique(keys, return_inverse=True)
 
     n_unique = int(unique_keys.shape[0])
