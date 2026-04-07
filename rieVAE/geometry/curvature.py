@@ -127,6 +127,13 @@ def triangle_areas(
     or more generally 0.5 * sqrt(||l_ij||^2 ||l_ik||^2 - (l_ij . l_ik)^2)
     (parallelogram formula, valid in any dimension G).
 
+    NOTE: This function is NOT used by curvature_proxy, which normalizes by
+    ||l_{i->j}|| * ||l_{i->k}|| (product of edge lengths, Definition 4) rather
+    than the triangle area. The two normalizations differ by a factor of
+    1/(2 sin theta) where theta is the angle between legs. This function is
+    retained for potential future use (e.g., area-normalized curvature estimates
+    or surface area computations).
+
     Parameters
     ----------
     decoder : nn.Module
@@ -162,15 +169,22 @@ def curvature_proxy(
 ) -> torch.Tensor:
     """Scale-invariant curvature proxy kappa_hat for each triangle.
 
-    kappa_hat(i,j,k)  =  ||c_ijk|| / (||l_{i->j}|| * ||l_{k->i}||)
+    kappa_hat(i,j,k)  =  ||c_ijk|| / (||l_{i->j}|| * ||l_{i->k}||)
 
     where c_ijk = l_{i->j} + l_{j->k} + l_{k->i} is the ambient closure
     vector and l_{a->b} = J_f(z_a)(z_b - z_a) are the Riemannian log maps.
 
-    DENOMINATOR: uses ||l_{k->i}|| (base z_k) as a proxy for ||l_{i->k}||
-    (base z_i). By Lemma 1 both approximate d_R(z_i, z_k) with error
-    O(K r^3). Reusing l_{k->i} (already computed for the closure) saves one
-    batched JVP call without changing the asymptotic accuracy of the proxy.
+    DENOMINATOR: uses ||l_{i->k}|| (base z_i, direction z_k - z_i), matching
+    Definition 4 of the theory paper exactly. Both denominator terms use the
+    Jacobian at the SAME base point z_i, which is theoretically correct and
+    avoids systematic bias from mixing Jacobian scales at z_i and z_k.
+
+    NOTE: An earlier implementation reused l_{k->i} from the closure to save
+    one JVP call. That was rejected because ||l_{k->i}|| != ||l_{i->k}|| when
+    the Jacobian norm varies across the manifold (always true for non-isometric
+    decoders), introducing a systematic bias proportional to ||nabla J_f|| * r_n.
+    Since curvature_proxy is only called at evaluation time (not in the training
+    loop), the extra JVP call is negligible.
 
     THEORETICAL MEANING (Proposition 4 of the theory paper):
     kappa_hat measures MEAN CURVATURE |H|, NOT Gaussian curvature K.
@@ -205,17 +219,19 @@ def curvature_proxy(
     z_j = z_mu[j_idx]
     z_k = z_mu[k_idx]
 
-    # Three JVP calls -- one per directed edge of the closure triangle.
-    # l_ki serves double duty: closure vector AND denominator edge length.
+    # Four JVP calls: three for the closure triangle, one for the denominator.
+    # l_ij, l_jk, l_ki: the three directed edges of the closure c = l_ij + l_jk + l_ki
+    # l_ik:             the denominator's second edge, base z_i (matches Definition 4)
     l_ij = riemannian_log_maps_batched(decoder, z_i, z_j - z_i)
     l_jk = riemannian_log_maps_batched(decoder, z_j, z_k - z_j)
     l_ki = riemannian_log_maps_batched(decoder, z_k, z_i - z_k)
+    l_ik = riemannian_log_maps_batched(decoder, z_i, z_k - z_i)  # denominator, base z_i
 
     c = l_ij + l_jk + l_ki
     closure_norm = c.norm(dim=-1)
 
     norm_ij = l_ij.norm(dim=-1)
-    norm_ki = l_ki.norm(dim=-1)  # reused; approx ||l_{i->k}|| to O(K r^3)
-    denom = norm_ij * norm_ki
+    norm_ik = l_ik.norm(dim=-1)  # ||l_{i->k}||, exact match to Definition 4
+    denom = norm_ij * norm_ik
 
     return closure_norm / (denom + eps)
