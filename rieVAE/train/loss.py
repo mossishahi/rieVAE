@@ -61,10 +61,19 @@ def riemannian_edge_loss(
     """Riemannian log map reconstruction loss (the core geometric loss).
 
     Trains W and h_psi to predict Riemannian log maps:
-        L_Riem = E_{(i,j) in G} || W e_ij - l_ij ||^2
+        L_Riem = E_{(i,j) in G} || W mu_e_ij - l_ij ||^2
 
     where l_ij = J_f(z_i)(z_j - z_i) is computed via JVP with STOP-GRADIENT
     on f_theta (see Remark 1 in the theory paper).
+
+    MEAN-FIELD NOTE: The loss uses mu_e (the posterior MEAN of edge codes),
+    not reparameterized samples from q_psi(e_ij | Delta z_ij). This is the
+    standard mean-field variational approximation. The paper's notation
+    E_{e_ij ~ q}[...] is technically more general, but the mean-field form
+    mu_e @ W.T is used in both the forward pass (scrvae.py) and here, and is
+    internally consistent with the edge KL that regularizes the same mu_e.
+    Using the mean rather than samples reduces gradient variance and is standard
+    practice for structured variational inference.
 
     Parameters
     ----------
