@@ -162,31 +162,29 @@ def curvature_proxy(
 ) -> torch.Tensor:
     """Scale-invariant curvature proxy kappa_hat for each triangle.
 
-    kappa_hat(i,j,k)  =  ||c_ijk|| / (||l_ij|| * ||l_ik||)
+    kappa_hat(i,j,k)  =  ||c_ijk|| / (||l_{i->j}|| * ||l_{k->i}||)
 
     where c_ijk = l_{i->j} + l_{j->k} + l_{k->i} is the ambient closure
-    vector, and l_{i->j} = J_f(z_i)(z_j - z_i) are the Riemannian log maps.
+    vector and l_{a->b} = J_f(z_a)(z_b - z_a) are the Riemannian log maps.
 
-    MATHEMATICAL MOTIVATION (Proposition 3, corrected):
-    For a sphere of radius R, two limiting values apply:
+    DENOMINATOR: uses ||l_{k->i}|| (base z_k) as a proxy for ||l_{i->k}||
+    (base z_i). By Lemma 1 both approximate d_R(z_i, z_k) with error
+    O(K r^3). Reusing l_{k->i} (already computed for the closure) saves one
+    batched JVP call without changing the asymptotic accuracy of the proxy.
 
-    (a) At the isometrically calibrated fixed point (pullback metric = true metric):
-            kappa_hat -> 2/R = 2*sqrt(K)
-    (b) For an uncalibrated decoder with random embedding A in R^G and uniform
-        scale factor alpha:
-            kappa_hat -> (2/R) * sqrt(3/G)  [for A ~ N(0, 1/sqrt(3))]
+    THEORETICAL MEANING (Proposition 4 of the theory paper):
+    kappa_hat measures MEAN CURVATURE |H|, NOT Gaussian curvature K.
+    - For codimension-1 surfaces with legs along principal directions:
+          kappa_hat -> 2|H| = |kappa_1 + kappa_2|
+    - For umbilic surfaces (sphere, kappa_1 = kappa_2 = 1/R):
+          kappa_hat -> 2/R = 2*sqrt(K)  [special case only]
+    - K = 0 does NOT imply kappa_hat = 0 (cylinder: K=0, H=1/(2R) > 0).
+    - kappa_hat = 0 iff the decoder is locally affine (h = 0 everywhere).
 
-    Both are correct for different regimes. The value 2/R is the ASYMPTOTIC
-    TARGET that the self-consistent iteration approaches as n, T -> infinity.
-    The deviation |kappa_hat - 2*sqrt(K)| is a quantitative measure of remaining
-    isometric distortion. For a nonlinear decoder, kappa_hat varies across
-    triangles (due to position-varying Jacobian scale); report the mean.
-
-    Properties:
-        - kappa_hat = 0 iff the decoder is locally affine (K = 0 locally).
-        - kappa_hat -> 2*sqrt(K) at the isometrically calibrated fixed point.
-        - kappa_hat -> (2/R)*sqrt(3/G) for uncalibrated random embeddings.
-        - Scale-invariant with respect to latent coordinate rescaling.
+    Reconstruction-dominated regime (MSE-trained decoders, both manifolds):
+    - Sphere  (R=1,   G=50, A ~ N(0,1/sqrt(3))): kappa_hat* ~ 0.489
+    - Clifford flat torus (R=2, r=1, G=50):       kappa_hat* ~ 0.316
+    - Scale-invariant with respect to latent coordinate rescaling.
 
     Parameters
     ----------
@@ -207,8 +205,9 @@ def curvature_proxy(
     z_j = z_mu[j_idx]
     z_k = z_mu[k_idx]
 
+    # Three JVP calls -- one per directed edge of the closure triangle.
+    # l_ki serves double duty: closure vector AND denominator edge length.
     l_ij = riemannian_log_maps_batched(decoder, z_i, z_j - z_i)
-    l_ik = riemannian_log_maps_batched(decoder, z_i, z_k - z_i)
     l_jk = riemannian_log_maps_batched(decoder, z_j, z_k - z_j)
     l_ki = riemannian_log_maps_batched(decoder, z_k, z_i - z_k)
 
@@ -216,7 +215,7 @@ def curvature_proxy(
     closure_norm = c.norm(dim=-1)
 
     norm_ij = l_ij.norm(dim=-1)
-    norm_ik = l_ik.norm(dim=-1)
-    denom = norm_ij * norm_ik
+    norm_ki = l_ki.norm(dim=-1)  # reused; approx ||l_{i->k}|| to O(K r^3)
+    denom = norm_ij * norm_ki
 
     return closure_norm / (denom + eps)
