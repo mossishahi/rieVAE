@@ -314,6 +314,9 @@ def main() -> None:
         lambda_decorr=args.lambda_decorr,
         reset_optimizer_each_iteration=not args.no_reset_optimizer,
         distance_clip_factor=args.distance_clip_factor,
+        # Pinned to 0 to reproduce published sphere_v2 results.
+        # Set to 50 for new experiments (allows rediscovery of dropped edges).
+        n_extra_candidates=0,
         log_interval=args.log_interval,
         device=args.device,
         use_wandb=_use_wandb,
