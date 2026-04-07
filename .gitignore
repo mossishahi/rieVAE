@@ -7,6 +7,9 @@ dist/
 build/
 .eggs/
 
+# Paper text lives in a separate repo (rieVAE_text)
+docs/
+
 # SLURM job outputs
 slurm_*.job
 
