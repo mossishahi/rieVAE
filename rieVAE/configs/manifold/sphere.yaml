@@ -1,0 +1,2 @@
+_target_: rieVAE.manifold.Sphere
+dim: ${n_latent}

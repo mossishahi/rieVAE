@@ -1,0 +1,18 @@
+# Default spectral preprocessor settings.
+
+knn_k:                16
+spectral_truncation:  50
+radius_quantile:      0.995
+laplacian_type:       cknn
+cknn_k_cand:          50
+cknn_k_sigma:         7
+target_mode:          varadhan
+varadhan_t:           null
+use_pe:               false
+pe_dim:               null
+pe_alpha:             0.5
+use_global_order:     false
+global_order_pe_alpha: 0.5
+use_omega_reweight:   false
+omega_k_pca:          20
+omega_clip:           [0.25, 4.0]

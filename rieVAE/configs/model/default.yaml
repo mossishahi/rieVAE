@@ -1,0 +1,14 @@
+# Default architecture knobs for RiemannianVAE.
+
+encoder_hidden:      [256, 256]
+decoder_hidden:      [256, 256]
+edge_decoder_hidden: [256, 256]
+dropout:             0.05
+var_eps:             1.0e-5
+activation:          silu
+encoder_spectral_norm:         false
+encoder_spectral_norm_max_lip: 1.0
+edge_decoder_type:   scalar
+edge_decoder_w_init: 0.0
+use_pe:              false
+pe_dim:              null

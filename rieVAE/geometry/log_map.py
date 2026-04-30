@@ -59,6 +59,8 @@ def riemannian_log_maps_batched(
     decoder: nn.Module,
     z_src: torch.Tensor,
     delta_z: torch.Tensor,
+    decoder_grad_weight: float = 0.0,
+    detach_z: bool = False,
 ) -> torch.Tensor:
     """Compute Riemannian log maps for all edges in a batch.
 
@@ -73,11 +75,28 @@ def riemannian_log_maps_batched(
         Source latent points for each directed edge.
     delta_z : (E, d)
         Latent differences z_dst - z_src for each directed edge.
+    decoder_grad_weight : float
+        Fraction of gradient that flows to the decoder (0 = full stop-grad,
+        1 = full gradient).  Intermediate values blend detached and attached
+        log maps: out = (1-w)*l.detach() + w*l.  Coupled to 1 - alpha_euclid
+        in the trainer: when the G-step is mostly Euclidean (alpha high),
+        log-map targets are noisy and stop-grad is correct; when the G-step
+        is mostly Riemannian (alpha low), targets are meaningful and the
+        decoder should learn from them directly.
+    detach_z : bool, default False
+        When True, detach z_src and delta_z before the JVP so gradient flows
+        ONLY through the decoder weights, not through the latent positions.
+        Use this for the scalar anchor's JVP computation to prevent the anchor
+        from creating a gradient feedback loop to the encoder: the decoder is
+        trained to produce correct Jacobian norms at the current (fixed)
+        latent positions without coupling to the encoder's gradient path.
+        Ignored when decoder_grad_weight <= 0 (full stop-grad already blocks
+        all gradient).
 
     Returns
     -------
     log_maps : (E, G)
-        Riemannian log map vectors. Detached from the decoder's parameters.
+        Riemannian log map vectors.
     """
     was_training = decoder.training
     decoder.eval()
@@ -85,17 +104,36 @@ def riemannian_log_maps_batched(
     def f_single(z: torch.Tensor) -> torch.Tensor:
         return decoder(z.unsqueeze(0)).squeeze(0)
 
-    def jvp_single(z: torch.Tensor, dz: torch.Tensor) -> torch.Tensor:
-        with torch.no_grad():
-            _, tangent = jvp(f_single, (z,), (dz,))
+    if decoder_grad_weight <= 0.0:
+        def jvp_single(z: torch.Tensor, dz: torch.Tensor) -> torch.Tensor:
+            with torch.no_grad():
+                _, tangent = jvp(f_single, (z,), (dz,))
+            return tangent
+        log_maps = vmap(jvp_single)(z_src, delta_z)
+        if was_training:
+            decoder.train()
+        return log_maps.detach()
+
+    # When detach_z=True, fix the base points so gradient flows only
+    # through decoder parameters, not through the encoder's z outputs.
+    z_in  = z_src.detach()   if detach_z else z_src
+    dz_in = delta_z.detach() if detach_z else delta_z
+
+    def jvp_single_grad(z: torch.Tensor, dz: torch.Tensor) -> torch.Tensor:
+        _, tangent = jvp(f_single, (z,), (dz,))
         return tangent
 
-    log_maps = vmap(jvp_single)(z_src, delta_z)
+    log_maps_attached = vmap(jvp_single_grad)(z_in, dz_in)
 
     if was_training:
         decoder.train()
 
-    return log_maps.detach()
+    if decoder_grad_weight >= 1.0:
+        return log_maps_attached
+
+    log_maps_detached = log_maps_attached.detach()
+    w = decoder_grad_weight
+    return (1.0 - w) * log_maps_detached + w * log_maps_attached
 
 
 def riemannian_distances(log_maps: torch.Tensor) -> torch.Tensor:

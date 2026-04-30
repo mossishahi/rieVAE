@@ -1,0 +1,3 @@
+_target_: rieVAE.manifold.FlatTorus
+dim: ${n_latent}
+radii: [2.0, 1.0]

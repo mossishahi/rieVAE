@@ -1,0 +1,7 @@
+# Load (N, G) tensor from a .npy file on disk.
+#
+# Usage example:
+#   python -m rieVAE data=tensor_from_npy data.path=/abs/path/to/x.npy
+
+_target_: rieVAE.__main__._load_npy
+path: ???

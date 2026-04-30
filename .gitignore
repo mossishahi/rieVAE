@@ -18,11 +18,32 @@ tests/
 
 # SLURM job outputs
 slurm_*.job
+slurm-*.out
+slurm_*.out
 
 # Experiment runs and checkpoints
 runs/
 wandb/
 *.ckpt
+
+# Lightning training run artefacts (kept local; not part of the repo)
+lightning_logs/
+
+# Local Cursor IDE files (session handoffs, skill caches, etc.)
+.cursor/
+
+# Local data and binary artefacts
+*.npy
+*.npz
+data_cache/
+
+# Working / WIP markdown notes that live alongside the code but
+# should not be tracked (use the canonical action plan in
+# rieVAE_text/op47C.md as the source of truth).
+baseline_*.md
+baselines_*.md
+gem31p.md
+gpt55.tex
 
 # IDE
 .vscode/

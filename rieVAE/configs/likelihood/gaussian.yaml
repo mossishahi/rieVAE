@@ -1,0 +1,4 @@
+_target_: rieVAE.likelihood.Gaussian
+n_features: ${n_features}
+sigma: 1.0
+learn_sigma: false

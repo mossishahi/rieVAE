@@ -1,0 +1,23 @@
+# Top-level Hydra config for rieVAE training.
+#
+# Usage:
+#   python -m rieVAE.train manifold=torus likelihood=nb plan=iso
+#   python -m rieVAE.train -m manifold=euclidean,torus likelihood=gaussian,nb plan=iso,iso_plus_rank
+#
+# Sub-groups under defaults select one config from each registry:
+
+defaults:
+  - data:        synthetic_random
+  - manifold:    euclidean
+  - likelihood:  gaussian
+  - model:       default
+  - preprocess:  default
+  - plan:        iso
+  - trainer:     lightning_default
+  - _self_
+
+# Top-level run knobs. Override on the CLI as run.seed=123 etc.
+seed:    0
+n_features: 50
+n_latent:   2
+output_dir: outputs/${now:%Y-%m-%d_%H-%M-%S}

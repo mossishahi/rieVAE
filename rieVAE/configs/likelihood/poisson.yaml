@@ -1,0 +1,2 @@
+_target_: rieVAE.likelihood.Poisson
+n_features: ${n_features}

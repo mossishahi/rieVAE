@@ -1,0 +1,16 @@
+_target_: rieVAE.training.IsoTrainingPlan
+beta:                 0.01
+beta_min:             0.0
+beta_linear_decay_on: false
+gamma_max:            1.0
+gamma_sigmoid_k:      8.0
+gamma_sigmoid_center: 0.2
+learning_rate:        1.0e-3
+weight_decay:         0.0
+decoder_lr_scale:     1.0
+grad_clip_norm:       0.0
+lr_scheduler:         null
+lr_min:               1.0e-6
+lr_warmup_steps:      0
+use_initial_scale_norm: true
+scale_eps:            1.0e-6

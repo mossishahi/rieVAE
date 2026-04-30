@@ -1,0 +1,5 @@
+# Synthetic random Gaussian data (smoke-test default).
+# Replace with a custom dataset config that loads from disk.
+
+_target_: torch.randn
+size: [3000, ${n_features}]

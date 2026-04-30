@@ -1,0 +1,31 @@
+# pl.Trainer kwargs.
+#
+# Override at the CLI:
+#   python -m rieVAE.train trainer.devices=4 trainer.strategy=ddp
+
+max_epochs:        50
+max_steps:         50000
+n_steps_per_epoch: 1000
+anchor_batch_size: 512
+accelerator:       auto
+devices:           1
+strategy:          auto
+log_every_n_steps: 50
+gradient_clip_val: null
+deterministic:     false
+
+# CertificateObserverCallback knobs.
+cert_every_n_steps:   500
+cert_subsample:       2048
+cert_pullback_nodes:  32
+cert_chart_regime:    general
+force_global_at_end:  true
+
+# PostHocCalibrationCallback / PEAuxFitCallback knobs.
+post_hoc_calibration: true
+pe_posthoc_steps:     2000
+pe_posthoc_lr:        1.0e-3
+pe_posthoc_batch:     512
+
+# Multi-GPU certificate reduction (no-op single-process).
+multi_gpu_cert_reduce: true
