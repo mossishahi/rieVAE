@@ -212,17 +212,33 @@ def solve_laplacian_eigenpairs(
 
 
 # ---------------------------------------------------------------- biharmonic distance
+#
+# ABLATION-ONLY -- NOT the paper's method.
+#
+# The biharmonic distance d_bih(x_i,x_j)^2 = sum_l lambda_l^{-2}
+# (phi_l(x_i) - phi_l(x_j))^2 (lambda^{-2} weighting) was used in
+# earlier drafts of the paper and is retained ONLY as a comparison
+# baseline for ablation experiments (target_mode='bih' in the
+# preprocessor). It is NOT part of the certified iso-architecture.
+#
+# Reason for removal: on S^1 (and analogously on other manifolds),
+# d_bih = C_manifold * d^M with a manifold-specific constant C_manifold
+# (e.g. 0.724 on S^1, provable analytically via Parseval). This fixed
+# multiplicative bias does NOT vanish as K -> infinity, so d_bih is NOT
+# bi-Lipschitz to d^M -- it is a scaled version of it. The Varadhan
+# formula sqrt(-4t*log K_t) is the correct proxy (converges to d^M).
+#
+# These functions are NOT exported from rieVAE.geometry.__init__ and
+# should NOT be used in new experiments or paper figures.
 
 def biharmonic_feature_map(
     eigvals: np.ndarray,
     eigvecs: np.ndarray,
 ) -> np.ndarray:
-    """Spectral embedding Psi(x_i)_l = lambda_l^{-1} phi_l(x_i).
+    """[ABLATION ONLY] Spectral embedding Psi(x_i)_l = lambda_l^{-1} phi_l(x_i).
 
-    Used in the proof of Lemma lem:spec_premetric: d_bih(x_i, x_j)^2
-    = ||Psi(x_i) - Psi(x_j)||_2^2, a squared Euclidean distance in
-    R^k. Hence the P1-P3 axioms and bi-Lipschitz equivalence are
-    inherited from standard facts about the spectral embedding.
+    Used only for ablation comparisons (target_mode='bih'). Not the
+    paper's method; see module-level comment above.
 
     Parameters
     ----------

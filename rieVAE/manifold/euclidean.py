@@ -1,6 +1,8 @@
 """Euclidean latent manifold M_z = R^d (the iso-architecture default)."""
 from __future__ import annotations
 
+import warnings
+
 import torch
 import torch.nn as nn
 
@@ -28,10 +30,13 @@ class Euclidean(nn.Module):
           - 'partial'  : translation-invariant prior; KL regularises
                          sigma only, leaves mu unconstrained (this
                          is the iso default; see main.tex sec:method).
-          - 'flat'     : entropy-only KL = -0.5 * (1 + log var). The
-                         manuscript reserves "flat" for flat-curvature
-                         manifolds (FlatTorus); we keep this string for
-                         backward compatibility but prefer 'partial'.
+          - 'flat'     : entropy-only KL = -0.5 * (1 + log var).
+                         DEPRECATED -- has NO stable fixed point for
+                         sigma (gradient is always negative, driving
+                         sigma to infinity). Kept for backward
+                         compatibility only; a DeprecationWarning is
+                         raised at construction and at every kl call.
+                         Use 'partial' instead.
     """
 
     name = "euclidean"
@@ -44,6 +49,18 @@ class Euclidean(nn.Module):
             raise ValueError(
                 f"Euclidean.default_kl_mode must be 'standard', "
                 f"'partial', or 'flat'; got {default_kl_mode!r}"
+            )
+        if default_kl_mode == "flat":
+            warnings.warn(
+                "Euclidean(default_kl_mode='flat') uses the entropy-only "
+                "KL = -0.5*(1+log var), which has NO stable fixed point "
+                "for sigma (the gradient is always negative, driving "
+                "sigma to infinity during training). Use 'partial' instead: "
+                "kl_partial = 0.5*(var - 1 - log var) has a stable minimum "
+                "at var=1 (sigma=1). 'flat' is retained for backward "
+                "compatibility only and will be removed in a future version.",
+                DeprecationWarning,
+                stacklevel=2,
             )
         self.dim = int(dim)
         self.chart_dim = int(dim)
@@ -66,6 +83,12 @@ class Euclidean(nn.Module):
         elif mode == "partial":
             kl_per_dim = 0.5 * (var - 1.0 - var.log())
         elif mode == "flat":
+            warnings.warn(
+                "kl_mode='flat' (entropy-only) has no stable sigma fixed "
+                "point. Use kl_mode='partial' (the iso-architecture default).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             kl_per_dim = -0.5 * (1.0 + var.log())
         else:
             raise ValueError(
