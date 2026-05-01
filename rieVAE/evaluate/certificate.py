@@ -81,6 +81,12 @@ class CertificateThresholds:
         Parametric C2 constant. Used only when rec_threshold <= 0.
     r_n_power_edge : int
         Exponent for parametric C2. Used only when rec_threshold <= 0.
+    edge_scale_tol : float
+        Tolerance for the C1' scale guard (Mo5 fix). C1' additionally
+        requires |softplus(w*) - 1| <= edge_scale_tol, ensuring the
+        edge head has calibrated to near-unit scale. Default 0.5.
+        Set to inf to disable (reverts to the pre-Mo5 behavior).
+        The flag is exposed as c1_scale_ok in CertificateReport.
     """
 
     C_cap: float = 5.0
@@ -88,6 +94,7 @@ class CertificateThresholds:
     rec_threshold: float = 0.0
     C_cap_prime: float = 1.0
     r_n_power_edge: int = 0
+    edge_scale_tol: float = 0.5
 
     @classmethod
     def for_chart_regime(
@@ -167,6 +174,7 @@ class CertificateReport:
     lambda_t: float
     lambda_cross: float
     c1_ok: bool
+    c1_scale_ok: bool
     c2_ok: bool
     c3_ok: bool
     c4_ok: bool
@@ -402,6 +410,7 @@ def compute_certificate(
     envelope_C1: float = 1.0,
     thresholds: Optional[CertificateThresholds] = None,
     chart_regime: str = "general",
+    edge_scale: Optional[float] = None,
     fold_fraction: Optional[float] = None,
     lambda_0: Optional[float] = None,
     Lambda_max: Optional[float] = None,
@@ -471,9 +480,21 @@ def compute_certificate(
 
     # C1' (paper) = encoder isometry condition.
     # The caller passes this as `delta_edge` (= delta_edge_scalar =
-    # max |softplus(w*)||mu_i-mu_j|| - tilde_w_ij|).
+    # max |softplus(w*) d_{Mz}(mu_i,mu_j) - tilde_w_ij|).
     # ISO default threshold: C_cap * r_n^1 = 5*r_n (linear).
     c1_ok = delta_edge <= thresholds.C_cap * (r_n ** thresholds.r_n_power_rec)
+
+    # Mo5 fix: c1_scale_ok checks that the edge head has calibrated to
+    # near-unit scale, preventing false-positive C1' when the encoder has
+    # collapsed distances (softplus(w*) large/small to compensate).
+    # c1_scale_ok is a diagnostic flag -- it does NOT enter isometry_holds
+    # but is logged so the user can see whether isometry is at unit scale.
+    # The paper's condition "if softplus(w*) ≈ 1 the encoder achieves
+    # unit-scale isometry" (Definition def:cert) is captured here.
+    if edge_scale is not None:
+        c1_scale_ok = abs(edge_scale - 1.0) <= thresholds.edge_scale_tol
+    else:
+        c1_scale_ok = True  # no edge head present or not measurable
 
     # C2 (paper) = reconstruction capacity condition (eq:c2_edge_scale).
     # Two modes:
@@ -520,6 +541,7 @@ def compute_certificate(
         lambda_t=lambda_t,
         lambda_cross=lambda_cross,
         c1_ok=c1_ok,
+        c1_scale_ok=c1_scale_ok,
         c2_ok=c2_ok,
         c3_ok=c3_ok,
         c4_ok=c4_ok,

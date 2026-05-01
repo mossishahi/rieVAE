@@ -93,6 +93,21 @@ class SpectralArtefacts:
         reconstruction loss L_rec falls below this value.  Computed once
         from edge_weight at the end of .fit() and stored here so it can
         be passed directly to CertificateThresholds.
+    intrinsic_dim : int
+        Two-NN MLE estimate of the manifold's intrinsic dimension,
+        computed from x_active (Facco et al. 2017, same estimator as
+        rieVAE.evaluate.certificate.intrinsic_dim_estimate).  Used as
+        the dimension d in r_n = (log n / n)^{1/d} for the certificate,
+        replacing the unsafe fallback of using model.dim_latent (which
+        may differ from the true intrinsic dimension).
+    e_star_connected : bool
+        True iff the final E^* edge set (after Varadhan validity
+        filtering) is a connected graph on the active nodes.  The
+        Dijkstra spanning argument of Cor. cor:clgg requires E^* to be
+        connected; this flag is False when the Varadhan filter has
+        removed enough edges to disconnect the graph (the certificate's
+        global-pair conclusion is then not supported by the spanning
+        argument).
     """
 
     x_active: torch.Tensor
@@ -110,6 +125,8 @@ class SpectralArtefacts:
     psi_full: Optional[torch.Tensor] = None
     omega: Optional[torch.Tensor] = None
     rec_threshold: float = 0.0
+    intrinsic_dim: int = 2
+    e_star_connected: bool = True
 
 
 class SpectralPreprocessor:
@@ -369,10 +386,56 @@ class SpectralPreprocessor:
                 omega_max=float(self.omega_clip[1]),
             )
 
-        # Compute the parameter-free C2 threshold T^{E*}_rec =
-        # mean(tilde_w^2) over E* (eq:c2_edge_scale, main.tex).
-        # This is in the same squared-distance units as L_rec and
-        # automatically adapts to data scale and sample size.
+        # --- Mo2: intrinsic dimension estimate (Two-NN MLE, Facco 2017) ---
+        # Used as d in r_n = (log n / n)^{1/d} for the certificate, instead
+        # of the unsafe fallback model.dim_latent.
+        try:
+            from sklearn.neighbors import NearestNeighbors as _NNS
+            _x_np = x_active.detach().cpu().float().numpy()
+            _rng = np.random.default_rng(0)
+            _n_anchor = min(1024, _x_np.shape[0] - 1)
+            _idx = _rng.choice(_x_np.shape[0], size=_n_anchor, replace=False)
+            _nbrs = _NNS(n_neighbors=3, algorithm="auto").fit(_x_np)
+            _dists, _ = _nbrs.kneighbors(_x_np[_idx])
+            _mu = _dists[:, 2] / np.maximum(_dists[:, 1], 1e-12)
+            _mu = _mu[_mu > 1.0]
+            if len(_mu) > 0:
+                _d_hat = int(max(1, round(1.0 / float(np.mean(np.log(_mu))))))
+            else:
+                _d_hat = int(getattr(x_active, "shape", [None, 2])[1] // 4 or 2)
+            intrinsic_dim = max(1, min(_d_hat, x_active.shape[1] - 1))
+        except Exception:
+            intrinsic_dim = 2
+            print("[preprocessor] intrinsic_dim_estimate failed; defaulting to 2",
+                  flush=True)
+
+        # --- Mo3: E* connectivity check after Varadhan filter ---
+        e_star_connected = True
+        if edge_index.numel() > 0:
+            try:
+                from scipy.sparse import csr_matrix
+                from scipy.sparse.csgraph import connected_components
+                _n = n_active
+                _src = edge_index[0].cpu().numpy()
+                _dst = edge_index[1].cpu().numpy()
+                _data = np.ones(len(_src), dtype=np.float32)
+                _adj = csr_matrix((_data, (_src, _dst)), shape=(_n, _n))
+                _n_comp, _ = connected_components(_adj, directed=False)
+                e_star_connected = bool(_n_comp == 1)
+                if not e_star_connected:
+                    print(
+                        f"[preprocessor] WARNING: E* is NOT connected after "
+                        f"Varadhan filtering ({_n_comp} components). "
+                        f"The graph-geodesic spanning argument of Cor. cor:clgg "
+                        f"is not supported. Consider increasing K "
+                        f"(spectral_truncation) or adjusting varadhan_t. "
+                        f"varadhan_invalid_frac={varadhan_invalid_frac:.3f}",
+                        flush=True,
+                    )
+            except Exception:
+                e_star_connected = True
+
+        # --- C2 threshold: mean(tilde_w^2) over E* (eq:c2_edge_scale) ---
         if edge_weight.numel() > 0:
             rec_threshold = float(edge_weight.pow(2).mean().item())
         else:
@@ -394,4 +457,6 @@ class SpectralPreprocessor:
             psi_full=psi_full,
             omega=omega,
             rec_threshold=rec_threshold,
+            intrinsic_dim=intrinsic_dim,
+            e_star_connected=e_star_connected,
         )

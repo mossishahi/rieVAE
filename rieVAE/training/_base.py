@@ -277,13 +277,35 @@ if _PL_AVAILABLE:
 
             step = int(self.global_step)
             max_steps = int(self.max_steps)
+
+            # Mo1 fix: record per-term initial scales BEFORE computing the
+            # normalised loss so that step 0's backward uses correct denoms.
+            # We do a cheap no-grad pre-pass on the already-computed outputs
+            # (no extra model forward) to measure raw term magnitudes, then
+            # store them for the main loop below.
+            if (
+                self.use_initial_scale_norm
+                and float(self._term_scales_initialised.item()) < 0.5
+            ):
+                with torch.no_grad():
+                    pre_vals = [
+                        float(term.fn(self.model, outputs, batch).item())
+                        for term in self.terms
+                    ]
+                eps = self.scale_eps
+                new_scales = torch.tensor(
+                    [max(abs(v), eps) for v in pre_vals],
+                    dtype=self._term_scales.dtype,
+                    device=self._term_scales.device,
+                )
+                self._term_scales.copy_(new_scales)
+                self._term_scales_initialised.fill_(1.0)
+
             total = outputs["mu"].new_zeros(())
             diag: dict[str, Any] = {}
-            raw_vals: list[float] = []
             for k, term in enumerate(self.terms):
                 w = float(term.schedule(step, max_steps))
                 val = term.fn(self.model, outputs, batch)
-                raw_vals.append(float(val.detach().item()))
                 eps = self.scale_eps
                 denom = (
                     self._term_scales[k].item()
@@ -295,21 +317,6 @@ if _PL_AVAILABLE:
                 diag[f"L_{term.name}_raw"] = float(val.detach().item())
                 diag[f"L_{term.name}_eff"] = float(eff.detach().item())
                 diag[f"w_{term.name}"]     = w
-
-            # On step 0 we record per-term scales (one-time
-            # init_scale_from_batch in the pre-Phase-3 trainer).
-            if (
-                self.use_initial_scale_norm
-                and float(self._term_scales_initialised.item()) < 0.5
-            ):
-                eps = self.scale_eps
-                new_scales = torch.tensor(
-                    [max(abs(v), eps) for v in raw_vals],
-                    dtype=self._term_scales.dtype,
-                    device=self._term_scales.device,
-                )
-                self._term_scales.copy_(new_scales)
-                self._term_scales_initialised.fill_(1.0)
 
             diag["L_total"] = float(total.detach().item())
             self.log_dict({f"train/{k}": v for k, v in diag.items()}, on_step=True)

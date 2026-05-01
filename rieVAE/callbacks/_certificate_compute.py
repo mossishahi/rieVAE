@@ -253,7 +253,13 @@ def compute_global_certificate(
     finally:
         model.train()
 
-    r_n = rn_estimate(n_active, int(getattr(model, "dim_latent", 2)))
+    # Mo2 fix: use artefacts.intrinsic_dim (Two-NN MLE) as d for r_n,
+    # falling back to model.dim_latent only when not available.
+    intrinsic_dim = int(
+        getattr(artefacts, "intrinsic_dim", None)
+        or getattr(model, "dim_latent", 2)
+    )
+    r_n = rn_estimate(n_active, intrinsic_dim)
     lambda_cross = (r_n ** 2) / max(mu_hat_L, 1e-12)
 
     cert: dict = {
@@ -274,25 +280,42 @@ def compute_global_certificate(
         "global_n_used":     int(node_sub.numel()) if use_global else None,
     }
 
+    # Edge scale for Mo5 guard.
+    edge_scale_val: Optional[float] = None
+    if getattr(model, "edge_decoder_type", None) == "scalar":
+        try:
+            edge_scale_val = float(model.edge_decoder.scale.detach().item())
+        except Exception:
+            pass
+
     # compute_certificate -> isometry_holds = c1' AND c2 AND c3.
     try:
-        thresholds = CertificateThresholds.for_chart_regime(chart_regime)
+        rec_thr = float(getattr(artefacts, "rec_threshold", 0.0))
+        thresholds = CertificateThresholds.for_chart_regime(
+            chart_regime, rec_threshold=rec_thr,
+        )
         report = compute_certificate(
-            n=n_active, d=int(getattr(model, "dim_latent", 2)),
+            n=n_active, d=intrinsic_dim,
             delta_rec=delta_rec_global,
             delta_edge=delta_edge_scalar_global,
             mu_hat_1=mu_hat_L, mu_hat_1_output_layer=mu_hat_L,
             lambda_t=float(gamma_t),
             thresholds=thresholds,
+            edge_scale=edge_scale_val,
             is_global=bool(use_global),
             global_n_used=(int(node_sub.numel()) if use_global else None),
         )
         cert["isometry_holds"]    = bool(report.isometry_holds)
         cert["c1_ok"]             = bool(report.c1_ok)
+        cert["c1_scale_ok"]       = bool(report.c1_scale_ok)
         cert["c2_ok"]             = bool(report.c2_ok)
         cert["c3_ok"]             = bool(report.c3_ok)
         cert["c4_ok"]             = bool(report.c4_ok)
         cert["envelope_C1_rn"]    = float(report.envelope_C1_rn)
+        cert["intrinsic_dim_used"] = intrinsic_dim
+        cert["e_star_connected"]   = bool(
+            getattr(artefacts, "e_star_connected", True)
+        )
     except Exception:
         cert["isometry_holds"] = False
 
