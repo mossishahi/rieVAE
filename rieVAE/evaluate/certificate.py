@@ -41,73 +41,79 @@ import torch
 class CertificateThresholds:
     """Tunable thresholds for the four certificate conditions.
 
-    After the move to the iso-architecture, the logical roles of the
-    two capacity conditions changed (see Remark rem:cert_labels in the
-    paper and the NOTE below). The two scalars passed to
-    compute_certificate must be interpreted as:
+    C1' check (delta_edge parameter = paper's delta_iso):
+        max_{E*} |softplus(w*) d_{Mz}(mu_i, mu_j) - tilde_w_ij|
+        Threshold: C_cap * r_n^r_n_power_rec
+        Default: C_cap=5, r_n_power_rec=1  =>  5*r_n
 
-        delta_edge parameter -> C1' (encoder isometry condition):
-            max_{E*} |softplus(w*) ||mu_i-mu_j|| - tilde_w_ij|
-            Certificate threshold: C_cap * r_n^r_n_power_rec
-            ISO-arch default: C_cap=5, r_n_power_rec=1 (linear, paper's 5r_n)
+    C2 check -- two modes (parameter-free default recommended):
 
-        delta_rec parameter  -> C2 (reconstruction capacity):
-            sup_i ||f_theta(z_i) - x_i||
-            Certificate threshold: C_cap_prime * r_n^r_n_power_edge
-            ISO-arch default: C_cap_prime=1.0, r_n_power_edge=0
-            (absolute threshold; the reconstruction floor on
-            topologically nontrivial manifolds with Euclidean latent is
-            NOT O(r_n) -- it is set by the ambient embedding scale and
-            the topological fold. Setting r_n_power_edge=0 makes the
-            threshold an absolute constant C_cap_prime rather than
-            r_n-dependent.)
+        DEFAULT (parameter-free, eq:c2_edge_scale in main.tex):
+            rec_threshold > 0 (passed in from SpectralArtefacts):
+                L_rec <= rec_threshold  where
+                rec_threshold = mean_{E*}(tilde_w_{ij}^2) = Theta(r_n^2).
+            The threshold is computed at preprocessing and stored in
+            SpectralArtefacts.rec_threshold. It is data-scale-invariant,
+            n-dependent, and requires no user constant.
 
-    NOTE on the parameter naming mismatch (backward-compatible design):
-    The function parameter `delta_edge` corresponds to what the paper
-    calls delta_iso (C1', the ISO isometry condition). The parameter
-    `delta_rec` corresponds to what the paper calls C2 (reconstruction).
-    This matches the code's labeling convention (see Remark
-    rem:cert_labels in main.tex) and is intentional to avoid breaking
-    existing call sites; callers must pass delta_edge = delta_edge_scalar
-    (paper's delta_iso) and delta_rec = reconstruction_residual.
+        PARAMETRIC FALLBACK (rec_threshold <= 0):
+            L_rec <= C_cap_prime * r_n^r_n_power_edge
+            Default: C_cap_prime=1.0, r_n_power_edge=0 (absolute 1.0).
+            Use only when SpectralArtefacts is not available, e.g. in
+            unit tests.
+
+    NOTE on caller convention: `delta_edge` = delta_iso (C1'),
+    `delta_rec` = L_rec or sup ||f(z)-x|| depending on caller. The
+    parameter naming follows the code's historic labeling; see
+    Remark rem:cert_labels in main.tex.
 
     Parameters
     ----------
     C_cap : float
-        Capacity constant for the C1' isometry check (delta_edge param).
-    C_cap_prime : float
-        Capacity constant for the C2 reconstruction check (delta_rec
-        param). When r_n_power_edge=0 this is an absolute threshold.
+        Capacity constant for C1'. Default 5 (paper's 5*r_n).
     r_n_power_rec : int
-        Exponent for C1'. ISO default 1 (linear: C_cap * r_n).
+        Exponent for C1'. Default 1 (linear).
+    rec_threshold : float
+        Parameter-free C2 threshold (eq:c2_edge_scale). When > 0 this
+        overrides the parametric C_cap_prime fallback. Pass
+        SpectralArtefacts.rec_threshold here.
+    C_cap_prime : float
+        Parametric C2 constant. Used only when rec_threshold <= 0.
     r_n_power_edge : int
-        Exponent for C2. ISO default 0 (absolute: C_cap_prime).
+        Exponent for parametric C2. Used only when rec_threshold <= 0.
     """
 
     C_cap: float = 5.0
-    C_cap_prime: float = 1.0
     r_n_power_rec: int = 1
+    rec_threshold: float = 0.0
+    C_cap_prime: float = 1.0
     r_n_power_edge: int = 0
 
     @classmethod
     def for_chart_regime(
-        cls, chart_regime: str = "general", **kwargs,
+        cls,
+        chart_regime: str = "general",
+        rec_threshold: float = 0.0,
+        **kwargs,
     ) -> "CertificateThresholds":
         """ISO-architecture thresholds for the named chart regime.
 
-        'general'  -> C1': 5*r_n  (linear),  C2: absolute 1.0
-        'flat'     -> C1': 5*r_n^2 (quadratic, topo-matched), C2: absolute 1.0
+        Pass rec_threshold=artefacts.rec_threshold to use the
+        parameter-free C2 (recommended). When rec_threshold <= 0 the
+        parametric fallback C_cap_prime * r_n^r_n_power_edge is used.
+
+        'general'  -> C1': 5*r_n  (linear)
+        'flat'     -> C1': 5*r_n^2 (quadratic, topo-matched)
         """
         if chart_regime == "general":
-            defaults = dict(C_cap=5.0, r_n_power_rec=1,
-                            C_cap_prime=1.0, r_n_power_edge=0)
+            defaults = dict(C_cap=5.0, r_n_power_rec=1)
         elif chart_regime == "flat":
-            defaults = dict(C_cap=5.0, r_n_power_rec=2,
-                            C_cap_prime=1.0, r_n_power_edge=0)
+            defaults = dict(C_cap=5.0, r_n_power_rec=2)
         else:
             raise ValueError(
                 f"chart_regime must be 'general' or 'flat', got {chart_regime!r}"
             )
+        defaults["rec_threshold"] = float(rec_threshold)
         defaults.update(kwargs)
         return cls(**defaults)
 
@@ -147,8 +153,9 @@ class CertificateReport:
     # compute_certificate swaps the intuitive order to match the theorem:
     #   c1_ok <-> delta_edge parameter (= paper's C1': encoder isometry
     #             = |softplus(w*)||mu_i-mu_j|| - tilde_w| <= 5 r_n)
-    #   c2_ok <-> delta_rec  parameter (= paper's C2: reconstruction floor
-    #             = sup ||f(z_i) - x_i|| <= 1.0 absolute)
+    #   c2_ok <-> delta_rec  parameter (= paper's C2: reconstruction scale
+    #             = L_rec <= rec_threshold = mean_{E*}(tilde_w^2) [default]
+    #               or L_rec <= C_cap_prime * r_n^r_n_power_edge [fallback])
     #   c3_ok <-> mu_hat_1 > 0
     #   c4_ok <-> lambda_t >= lambda_cross  [diagnostic only, NOT in isometry_holds]
     # isometry_holds = c1_ok AND c2_ok AND c3_ok  (C4 excluded for ISO arch)
@@ -468,15 +475,21 @@ def compute_certificate(
     # ISO default threshold: C_cap * r_n^1 = 5*r_n (linear).
     c1_ok = delta_edge <= thresholds.C_cap * (r_n ** thresholds.r_n_power_rec)
 
-    # C2 (paper) = reconstruction capacity condition.
-    # The caller passes this as `delta_rec` (= sup ||f(z_i) - x_i||).
-    # ISO default threshold: C_cap_prime * r_n^0 = C_cap_prime (absolute).
-    # An absolute threshold is appropriate because on topologically
-    # nontrivial manifolds with Euclidean latent the reconstruction floor
-    # is set by the fold geometry and ambient embedding, not by r_n.
-    c2_ok = delta_rec <= thresholds.C_cap_prime * (
-        r_n ** thresholds.r_n_power_edge
-    )
+    # C2 (paper) = reconstruction capacity condition (eq:c2_edge_scale).
+    # Two modes:
+    #   DEFAULT (parameter-free): rec_threshold = mean_{E*}(tilde_w^2)
+    #     from SpectralArtefacts.rec_threshold.  The caller passes
+    #     delta_rec = L_rec (mean squared reconstruction loss).
+    #     This threshold is Theta(r_n^2), data-scale-invariant, and
+    #     automatically detects topology mismatch at large n.
+    #   PARAMETRIC FALLBACK: when rec_threshold <= 0, falls back to
+    #     C_cap_prime * r_n^r_n_power_edge (default: absolute 1.0).
+    if thresholds.rec_threshold > 0.0:
+        c2_ok = delta_rec <= thresholds.rec_threshold
+    else:
+        c2_ok = delta_rec <= thresholds.C_cap_prime * (
+            r_n ** thresholds.r_n_power_edge
+        )
     c3_ok = mu_hat_1 > 0.0
     c4_ok = lambda_t >= lambda_cross
 

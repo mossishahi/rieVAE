@@ -1,3 +1,8 @@
+# ISO-architecture training plan defaults.
+# These match the paper Algorithm (method_overview.tex Sec. 4-5):
+#   - decoder_lr_scale = 0.1  (two-timescale; decoder 10x slower)
+#   - grad_clip_norm   = 1.0  (global L2-norm clip)
+#   - weight_decay     = 1e-4 (AdamW decoupled weight decay)
 _target_: rieVAE.training.IsoTrainingPlan
 beta:                 0.01
 beta_min:             0.0
@@ -6,9 +11,9 @@ gamma_max:            1.0
 gamma_sigmoid_k:      8.0
 gamma_sigmoid_center: 0.2
 learning_rate:        1.0e-3
-weight_decay:         0.0
-decoder_lr_scale:     1.0
-grad_clip_norm:       0.0
+weight_decay:         1.0e-4
+decoder_lr_scale:     0.1
+grad_clip_norm:       1.0
 lr_scheduler:         null
 lr_min:               1.0e-6
 lr_warmup_steps:      0

@@ -13,6 +13,14 @@ This is the post-Phase-2 manifold-VAE template applied to the iso
 architecture. Setting ``LatentManifold = Euclidean(d, prior='partial')``
 and ``Likelihood = Gaussian`` recovers the Phase-1 / Phase-2
 ``IsoVAELoss`` byte-for-byte (regression-tested in the Phase-3 smoke).
+
+Defaults match the paper's Algorithm (method_overview.tex, Sec. 4-5):
+  - decoder_lr_scale = 0.1  (two-timescale: decoder 10x slower than encoder)
+  - grad_clip_norm   = 1.0  (global L2-norm clip before every step)
+  - weight_decay     = 1e-4 (AdamW decoupled weight decay)
+The two-timescale design prevents the decoder from converging on
+reconstruction before the encoder has organized the latent geometry;
+see method_overview.tex Sec. 4 for the rationale.
 """
 from __future__ import annotations
 
@@ -42,9 +50,9 @@ class IsoTrainingPlan(TrainingPlanBase):
         gamma_sigmoid_k: float = 8.0,
         gamma_sigmoid_center: float = 0.2,
         learning_rate: float = 1e-3,
-        weight_decay: float = 0.0,
-        decoder_lr_scale: float = 1.0,
-        grad_clip_norm: float = 0.0,
+        weight_decay: float = 1e-4,
+        decoder_lr_scale: float = 0.1,
+        grad_clip_norm: float = 1.0,
         lr_scheduler: Optional[str] = None,
         lr_min: float = 1e-6,
         lr_warmup_steps: int = 0,

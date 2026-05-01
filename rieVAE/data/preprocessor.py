@@ -86,6 +86,13 @@ class SpectralArtefacts:
     omega : (E,) or None
         Decoder-independent per-pair reweighting (Section sec:reweight);
         None when disabled.
+    rec_threshold : float
+        Parameter-free C2 reconstruction threshold
+        T^{E*}_rec = mean(tilde_w_{ij}^2) over E^* (eq:c2_edge_scale in
+        main.tex). Training is certified on C2 when the mean squared
+        reconstruction loss L_rec falls below this value.  Computed once
+        from edge_weight at the end of .fit() and stored here so it can
+        be passed directly to CertificateThresholds.
     """
 
     x_active: torch.Tensor
@@ -102,6 +109,7 @@ class SpectralArtefacts:
     pe_feat: Optional[torch.Tensor] = None
     psi_full: Optional[torch.Tensor] = None
     omega: Optional[torch.Tensor] = None
+    rec_threshold: float = 0.0
 
 
 class SpectralPreprocessor:
@@ -361,6 +369,15 @@ class SpectralPreprocessor:
                 omega_max=float(self.omega_clip[1]),
             )
 
+        # Compute the parameter-free C2 threshold T^{E*}_rec =
+        # mean(tilde_w^2) over E* (eq:c2_edge_scale, main.tex).
+        # This is in the same squared-distance units as L_rec and
+        # automatically adapts to data scale and sample size.
+        if edge_weight.numel() > 0:
+            rec_threshold = float(edge_weight.pow(2).mean().item())
+        else:
+            rec_threshold = 0.0
+
         return SpectralArtefacts(
             x_active=x_active,
             active_idx=active_idx,
@@ -376,4 +393,5 @@ class SpectralPreprocessor:
             pe_feat=pe_feat,
             psi_full=psi_full,
             omega=omega,
+            rec_threshold=rec_threshold,
         )

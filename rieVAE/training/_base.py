@@ -183,14 +183,15 @@ if _PL_AVAILABLE:
             The training-objective terms.
         learning_rate : float
         weight_decay : float
+            Decoupled weight decay for AdamW (paper default 1e-4).
         decoder_lr_scale : float
-            Multiplier on the decoder's learning rate. With
-            ``decoder_lr_scale=1.0`` (default) all parameters share a
-            single learning rate; otherwise the decoder uses
-            ``learning_rate * decoder_lr_scale`` and the rest use
-            ``learning_rate``.
+            Multiplier on the decoder's learning rate. The paper's
+            two-timescale default is 0.1 (decoder 10x slower than
+            encoder). With ``decoder_lr_scale=1.0`` all parameters
+            share a single learning rate.
         grad_clip_norm : float
-            Per-step gradient clip; 0 disables.
+            Global L2-norm gradient clip before every step (paper
+            default 1.0). Set to 0 to disable.
         lr_scheduler : str or None
             'cosine', 'linear', 'constant', or None.
         lr_min : float
@@ -336,7 +337,7 @@ if _PL_AVAILABLE:
                     {"params": other_params,   "lr": base_lr,                          "name": "rest"},
                     {"params": decoder_params, "lr": base_lr * self.decoder_lr_scale,   "name": "decoder"},
                 ]
-            optimizer = torch.optim.Adam(params, weight_decay=self.weight_decay)
+            optimizer = torch.optim.AdamW(params, weight_decay=self.weight_decay)
             if not self.lr_scheduler_kind:
                 return optimizer
             sched = self._make_lr_scheduler(optimizer)
