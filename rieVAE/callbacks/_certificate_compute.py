@@ -217,10 +217,30 @@ def compute_global_certificate(
                 reduction="max", latent_distance_fn=model.manifold.distance,
             )
             if getattr(model, "edge_decoder_type", None) == "scalar":
-                delta_edge_scalar_global = compute_delta_edge_scalar(
-                    edge_decoder=model.edge_decoder, mu=mu_eval,
-                    edge_index=sub_ei, tilde_w=sub_tilde_w, reduction="max",
-                )
+                # FV4 fix: compute the OLS-calibrated edge scale on the fly
+                # rather than reading the (untrained) model.edge_decoder.scale.
+                # Closed-form one-line linear regression with no intercept:
+                #     scale = sum_e (d_pred * tilde_w) / sum_e (d_pred^2)
+                # `scale` is what the post-hoc calibration callback would set
+                # at end-of-training. Reading it here gives a meaningful
+                # cert/edge_scale trajectory throughout training.
+                with torch.no_grad():
+                    _src = sub_ei[0]
+                    _dst = sub_ei[1]
+                    _d_pred = model.manifold.distance(
+                        mu_eval[_src], mu_eval[_dst],
+                    )
+                    _num = (_d_pred * sub_tilde_w).sum()
+                    _den = (_d_pred * _d_pred).sum().clamp_min(1e-12)
+                    edge_scale_ols = float((_num / _den).item())
+                # Now compute delta_edge_scalar using the OLS-calibrated
+                # scale, matching what the certificate would see after the
+                # post-hoc calibration runs at end-of-training.
+                with torch.no_grad():
+                    _abs_resid = (
+                        edge_scale_ols * _d_pred - sub_tilde_w
+                    ).abs()
+                    delta_edge_scalar_global = float(_abs_resid.max().item())
             ei_for_sc = sub_ei
             z_for_sc = mu_eval
         else:
@@ -288,12 +308,26 @@ def compute_global_certificate(
     }
 
     # Edge scale for Mo5 guard.
+    # FV4 fix: prefer the OLS-calibrated value (computed during the
+    # cert pass above) over the live model.edge_decoder.scale, because
+    # the live parameter is unconstrained and typically does not move
+    # during joint training -- post-hoc OLS calibration is what
+    # actually sets the deployed value. Both are logged.
     edge_scale_val: Optional[float] = None
+    edge_scale_live: Optional[float] = None
     if getattr(model, "edge_decoder_type", None) == "scalar":
         try:
-            edge_scale_val = float(model.edge_decoder.scale.detach().item())
+            edge_scale_live = float(
+                torch.nn.functional.softplus(
+                    model.edge_decoder.scale.detach()
+                ).item()
+            )
         except Exception:
             pass
+        try:
+            edge_scale_val = float(edge_scale_ols)  # may be unbound
+        except NameError:
+            edge_scale_val = edge_scale_live
 
     # compute_certificate -> isometry_holds = c1' AND c2 AND c3.
     try:
@@ -323,6 +357,12 @@ def compute_global_certificate(
         cert["e_star_connected"]   = bool(
             getattr(artefacts, "e_star_connected", True)
         )
+        # FV4 diagnostics: both edge-scale candidates (the OLS one is
+        # what the certificate uses; the live one is what the SGD
+        # parameter currently is). On a converged training run they
+        # should agree.
+        cert["edge_scale_ols"]    = float(edge_scale_val) if edge_scale_val is not None else float("nan")
+        cert["edge_scale_live"]   = float(edge_scale_live) if edge_scale_live is not None else float("nan")
     except Exception:
         cert["isometry_holds"] = False
 
