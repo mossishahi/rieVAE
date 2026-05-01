@@ -253,12 +253,19 @@ def compute_global_certificate(
     finally:
         model.train()
 
-    # Mo2 fix: use artefacts.intrinsic_dim (Two-NN MLE) as d for r_n,
-    # falling back to model.dim_latent only when not available.
-    intrinsic_dim = int(
-        getattr(artefacts, "intrinsic_dim", None)
-        or getattr(model, "dim_latent", 2)
-    )
+    # Mo2 fix (refined post-FV3): pick the SMALLER of the user-set
+    # dim_latent and the data-driven Two-NN estimate. Using the smaller
+    # value is the conservative choice: r_n = (log n / n)^{1/d} is
+    # SMALLER for smaller d, so the certificate threshold 5 r_n is
+    # tighter, biasing toward false rejections (safe) rather than
+    # false acceptances (dangerous). Two-NN MLE is known to drift
+    # upward on noisy data (FV3), so capping by dim_latent prevents
+    # over-permissive thresholds while still using Two-NN to catch
+    # over-specified n_latent.
+    estimated_d = int(getattr(artefacts, "intrinsic_dim", 0) or 0)
+    dim_latent  = int(getattr(model, "dim_latent", 0) or 0)
+    candidates  = [d for d in (estimated_d, dim_latent) if d >= 1]
+    intrinsic_dim = min(candidates) if candidates else 2
     r_n = rn_estimate(n_active, intrinsic_dim)
     lambda_cross = (r_n ** 2) / max(mu_hat_L, 1e-12)
 
