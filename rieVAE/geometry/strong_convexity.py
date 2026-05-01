@@ -729,13 +729,49 @@ def verify_restricted_sc_output_layer(
     edge_index = edge_index.to(device)
 
     decoder = model.node_decoder
+    manifold = getattr(model, "manifold", None)
+
+    # FV2 fix: route the JVP through `embed_for_decoder o decoder` so
+    # the input shape matches what the decoder expects (e.g., for
+    # FlatTorus the decoder takes (cos, sin, cos, sin), not raw chart
+    # coordinates). For Euclidean ``embed_for_decoder`` is identity, so
+    # this wrap is a no-op there. Without this, non-Euclidean latents
+    # silently fail the JVP and the certificate falls back to
+    # mu_hat_1 = 0 (= c3_ok=False), reporting a spurious failure of
+    # restricted strong convexity.
+    if manifold is not None and hasattr(manifold, "embed_for_decoder"):
+
+        class _DecoderThroughChart(nn.Module):
+            def __init__(_self):
+                super().__init__()
+                _self.dec = decoder
+                _self.man = manifold
+
+            def forward(_self, z):
+                return _self.dec(_self.man.embed_for_decoder(z))
+
+        decoder_eff = _DecoderThroughChart().to(device)
+    else:
+        decoder_eff = decoder
 
     # Mean log-map magnitude r_bar_mean.
+    # FV2 fix: dz must be the manifold-aware tangent direction. For
+    # FlatTorus the raw chart difference can be huge across the wrap-
+    # around boundary while the actual geodesic motion is small; using
+    # the wrapped difference brings the JVP into the correct regime.
+    # For other manifolds shipped today (Euclidean, Sphere, Hyperbolic
+    # tangent-at-origin chart) the raw difference is the correct
+    # tangent direction.
     src, dst = edge_index[0], edge_index[1]
     with torch.no_grad():
         z_src = z_mu[src]
-        dz = z_mu[dst] - z_src
-        log_maps = riemannian_log_maps_batched(decoder, z_src, dz)
+        raw_dz = z_mu[dst] - z_src
+        man_name = getattr(manifold, "name", "") if manifold is not None else ""
+        if man_name == "flat_torus":
+            dz = torch.atan2(torch.sin(raw_dz), torch.cos(raw_dz))
+        else:
+            dz = raw_dz
+        log_maps = riemannian_log_maps_batched(decoder_eff, z_src, dz)
         r_bar_mean = float(log_maps.norm(dim=1).clamp(min=1e-10).mean().item())
 
     # Coverage eigenvalue lambda_cov = lambda_min(M_cov).
