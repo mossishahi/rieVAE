@@ -17,7 +17,7 @@ except ImportError:
     _PL_AVAILABLE = False
     pl = None  # type: ignore[assignment]
 
-from rieVAE.train.loss import calibrate_edge_decoder_scale
+from rieVAE.training.loss import calibrate_edge_decoder_scale
 
 
 if _PL_AVAILABLE:

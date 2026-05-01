@@ -1,3 +1,3 @@
-_target_: rieVAE.manifold.Euclidean
+_target_: rieVAE.manifolds.Euclidean
 dim: ${n_latent}
 default_kl_mode: partial

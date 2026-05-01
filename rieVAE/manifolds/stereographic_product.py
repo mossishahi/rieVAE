@@ -21,7 +21,7 @@ from typing import Iterable, List
 import torch
 import torch.nn as nn
 
-from rieVAE.manifold._base import LatentManifold
+from rieVAE.manifolds._base import LatentManifold
 
 
 class StereographicProduct(nn.Module):

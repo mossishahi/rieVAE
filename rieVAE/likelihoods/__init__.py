@@ -11,17 +11,17 @@ Five concrete likelihoods + the protocol live here:
 Construct directly or via the string registry consumed by
 ``rieVAE.RiemannianVAE``:
 
-    >>> from rieVAE.likelihood import resolve_likelihood
+    >>> from rieVAE.likelihoods import resolve_likelihood
     >>> like = resolve_likelihood("nb", n_features=50)
     >>> like
     NegativeBinomial(n_features=50, dispersion='feature')
 """
-from rieVAE.likelihood._base import Likelihood
-from rieVAE.likelihood.gaussian import Gaussian
-from rieVAE.likelihood.negative_binomial import NegativeBinomial
-from rieVAE.likelihood.zinb import ZeroInflatedNegativeBinomial
-from rieVAE.likelihood.poisson import Poisson
-from rieVAE.likelihood.bernoulli import Bernoulli
+from rieVAE.likelihoods._base import Likelihood
+from rieVAE.likelihoods.gaussian import Gaussian
+from rieVAE.likelihoods.negative_binomial import NegativeBinomial
+from rieVAE.likelihoods.zinb import ZeroInflatedNegativeBinomial
+from rieVAE.likelihoods.poisson import Poisson
+from rieVAE.likelihoods.bernoulli import Bernoulli
 
 
 _LIKELIHOOD_BY_NAME: dict[str, str] = {

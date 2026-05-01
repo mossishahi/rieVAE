@@ -5,7 +5,7 @@ Christoffel symbols vanish, geodesics are straight lines in angular
 coordinates, and the Riemannian log map reduces to the component-wise
 wrapped difference. These two helpers are used by:
 
-  - :class:`rieVAE.train.proximal_trainer.ProximalSCRVAETrainer`'s
+  - the ``ProximalSCRVAETrainer``'s (deleted in Phase 3;
     ``_build_latent_distance_fn`` (so the iso loss measures the wrapped
     Clifford-torus distance when ``latent_topology='torus'``);
   - :class:`rieVAE.evaluate.isometry` evaluation paths that need a

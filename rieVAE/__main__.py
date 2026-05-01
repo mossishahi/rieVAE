@@ -73,7 +73,7 @@ def run(
     """
     if not _PL_AVAILABLE:
         raise ImportError(
-            "rieVAE.train.run requires pytorch_lightning."
+            "rieVAE.run requires pytorch_lightning."
         )
     pl.seed_everything(int(seed), workers=True)
 
@@ -230,7 +230,7 @@ else:  # pragma: no cover
 
     def main(*args, **kwargs):
         raise ImportError(
-            "rieVAE.train.main requires Hydra; install via "
+            "rieVAE.__main__ requires Hydra; install via "
             "`pip install hydra-core omegaconf`."
         )
 

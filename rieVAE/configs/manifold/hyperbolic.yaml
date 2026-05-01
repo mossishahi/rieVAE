@@ -1,3 +1,3 @@
-_target_: rieVAE.manifold.Hyperbolic
+_target_: rieVAE.manifolds.Hyperbolic
 dim: ${n_latent}
 curvature: -1.0

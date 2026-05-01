@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from rieVAE.likelihood.negative_binomial import NegativeBinomial
+from rieVAE.likelihoods.negative_binomial import NegativeBinomial
 
 
 class ZeroInflatedNegativeBinomial(nn.Module):

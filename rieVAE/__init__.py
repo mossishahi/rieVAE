@@ -4,8 +4,8 @@ Phase-3 (op47C C.3) replaces the imperative ``ProximalSCRVAETrainer``
 with a PyTorch Lightning training spine:
 
   * the model is the unified :class:`RiemannianVAE`, parameterised by
-    a ``LatentManifold`` plug-in (:mod:`rieVAE.manifold`) and a
-    ``Likelihood`` plug-in (:mod:`rieVAE.likelihood`);
+    a ``LatentManifold`` plug-in (:mod:`rieVAE.manifolds`) and a
+    ``Likelihood`` plug-in (:mod:`rieVAE.likelihoods`);
   * preprocessing is a standalone :class:`SpectralPreprocessor` that
     runs ONCE before training and produces :class:`SpectralArtefacts`
     (CkNN graph, Coifman-Lafon LBO, Varadhan targets, optional PE
@@ -69,8 +69,8 @@ Symbols deleted in Phase 3 (no backward-compat shim):
     ProximalSCRVAETrainer, TrainingConfig.
 """
 from rieVAE.model.riemannian_vae import RiemannianVAE
-from rieVAE.model.edge import JointEdgeDecoder, ScalarEdgeDecoder
-from rieVAE.manifold import (
+from rieVAE.modules.edge import JointEdgeDecoder, ScalarEdgeDecoder
+from rieVAE.manifolds import (
     LatentManifold,
     Euclidean,
     FlatTorus,
@@ -79,7 +79,7 @@ from rieVAE.manifold import (
     StereographicProduct,
     resolve_manifold,
 )
-from rieVAE.likelihood import (
+from rieVAE.likelihoods import (
     Likelihood,
     Gaussian,
     NegativeBinomial,

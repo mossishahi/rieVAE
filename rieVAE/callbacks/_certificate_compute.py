@@ -27,7 +27,7 @@ from rieVAE.geometry.strong_convexity import verify_restricted_sc_output_layer
 from rieVAE.geometry.encoder_regularity import (
     encoder_lipschitz_bound, ACTIVATION_BOUNDS,
 )
-from rieVAE.train.loss import compute_delta_iso, compute_delta_edge_scalar
+from rieVAE.training.loss import compute_delta_iso, compute_delta_edge_scalar
 
 
 def estimate_pullback_spectrum(

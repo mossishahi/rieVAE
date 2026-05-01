@@ -1,2 +1,2 @@
-_target_: rieVAE.likelihood.Bernoulli
+_target_: rieVAE.likelihoods.Bernoulli
 n_features: ${n_features}

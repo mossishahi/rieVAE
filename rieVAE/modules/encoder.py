@@ -1,7 +1,7 @@
 """Node encoder: maps observed features to variational latent codes.
 
 Architecture: feed-forward MLP with a configurable C^inf-smooth
-activation (SiLU by default; see ``rieVAE.model._activations``).
+activation (SiLU by default; see ``rieVAE.modules.activations``).
 The mu and log-variance heads are two separate linear layers on top
 of the shared backbone, so they can be initialised, regularised,
 or frozen independently.
@@ -23,7 +23,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from rieVAE.model._activations import make_activation
+from rieVAE.modules.activations import make_activation
 
 
 class ScaledSpectralLinear(nn.Module):

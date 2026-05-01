@@ -20,6 +20,6 @@ Step counter is always `step` (gradient step for proximal, global_epoch for
 full-batch), never `epoch` or `iter` — this eliminates the iter/epoch ambiguity.
 """
 
-from rieVAE.logging.experiment_logger import ExperimentLogger, METRIC_REGISTRY
+from rieVAE.loggers.experiment_logger import ExperimentLogger, METRIC_REGISTRY
 
 __all__ = ["ExperimentLogger", "METRIC_REGISTRY"]

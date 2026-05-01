@@ -4,7 +4,7 @@ The former linear Stiefel-constrained edge decoder W has been replaced
 by the joint edge decoder F_phi (see rieVAE/model/edge.py). This
 module now contains only the node decoder f_theta used to reconstruct
 ambient features from latent codes. Activation is configurable
-through ``rieVAE.model._activations`` (default SiLU; ReLU is
+through ``rieVAE.modules.activations`` (default SiLU; ReLU is
 intentionally not exposed because Lemma 1's curvature remainder
 requires C^3).
 """
@@ -13,7 +13,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from rieVAE.model._activations import make_activation
+from rieVAE.modules.activations import make_activation
 
 
 class NodeDecoder(nn.Module):

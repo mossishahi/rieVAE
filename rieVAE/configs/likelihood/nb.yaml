@@ -1,4 +1,4 @@
-_target_: rieVAE.likelihood.NegativeBinomial
+_target_: rieVAE.likelihoods.NegativeBinomial
 n_features: ${n_features}
 dispersion: feature
 init_theta: 1.0

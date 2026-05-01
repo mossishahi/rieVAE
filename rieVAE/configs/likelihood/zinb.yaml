@@ -1,4 +1,4 @@
-_target_: rieVAE.likelihood.ZeroInflatedNegativeBinomial
+_target_: rieVAE.likelihoods.ZeroInflatedNegativeBinomial
 n_features: ${n_features}
 dispersion: feature
 init_theta: 1.0

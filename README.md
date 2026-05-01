@@ -108,7 +108,7 @@ model = rieVAE.RiemannianVAE(
 NB / Poisson accept an optional per-sample `scale_factor` (the GLM
 exposure / offset) when the feature totals vary across samples. Custom
 likelihoods are a one-file class implementing the `Likelihood` protocol
-(see `rieVAE/likelihood/_base.py`).
+(see `rieVAE/likelihoods/_base.py`).
 
 ---
 

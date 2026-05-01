@@ -41,11 +41,11 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from rieVAE.manifold import LatentManifold, resolve_manifold
-from rieVAE.likelihood import Likelihood, resolve_likelihood
-from rieVAE.model.encoder import NodeEncoder
-from rieVAE.model.decoder import NodeDecoder
-from rieVAE.model.edge import JointEdgeDecoder, ScalarEdgeDecoder
+from rieVAE.manifolds import LatentManifold, resolve_manifold
+from rieVAE.likelihoods import Likelihood, resolve_likelihood
+from rieVAE.modules.encoder import NodeEncoder
+from rieVAE.modules.decoder import NodeDecoder
+from rieVAE.modules.edge import JointEdgeDecoder, ScalarEdgeDecoder
 
 
 class RiemannianVAE(nn.Module):
@@ -63,7 +63,7 @@ class RiemannianVAE(nn.Module):
         One of ``"euclidean"`` (default), ``"torus"`` /
         ``"flat_torus"``, ``"sphere"``, ``"hyperbolic"``,
         ``"stereographic_product"``, or a ``LatentManifold`` instance.
-        See ``rieVAE.manifold`` for the registry. Extra keyword
+        See ``rieVAE.manifolds`` for the registry. Extra keyword
         arguments accepted by the constructor (e.g.,
         ``radii=(2.0, 1.0)`` for FlatTorus or ``curvature=-1.0`` for
         Hyperbolic) can be forwarded via ``manifold_kwargs``.

@@ -22,7 +22,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from rieVAE.model._activations import make_activation
+from rieVAE.modules.activations import make_activation
 
 
 class JointEdgeDecoder(nn.Module):
@@ -116,7 +116,7 @@ class ScalarEdgeDecoder(nn.Module):
 
     The scalar w_raw is calibrated post hoc by ordinary least squares
     against the spectral target on E* (see
-    :func:`rieVAE.train.loss.calibrate_edge_decoder_scale` and the
+    :func:`rieVAE.training.loss.calibrate_edge_decoder_scale` and the
     trainer's ``_calibrate_edge_scale_posthoc``); it receives no
     gradient from the iso loss. The encoder is constrained directly
     by L_iso, which uses ``latent_distance_fn`` to measure the same

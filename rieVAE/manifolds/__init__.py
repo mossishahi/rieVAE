@@ -11,17 +11,17 @@ Five concrete manifolds + the protocol live here:
 Construct directly or via the string registry consumed by
 ``rieVAE.RiemannianVAE``:
 
-    >>> from rieVAE.manifold import resolve_manifold
+    >>> from rieVAE.manifolds import resolve_manifold
     >>> M = resolve_manifold("torus", n_latent=2)
     >>> M
     FlatTorus(dim=2, radii=(1.0, 1.0))
 """
-from rieVAE.manifold._base import LatentManifold
-from rieVAE.manifold.euclidean import Euclidean
-from rieVAE.manifold.flat_torus import FlatTorus
-from rieVAE.manifold.sphere import Sphere
-from rieVAE.manifold.hyperbolic import Hyperbolic
-from rieVAE.manifold.stereographic_product import StereographicProduct
+from rieVAE.manifolds._base import LatentManifold
+from rieVAE.manifolds.euclidean import Euclidean
+from rieVAE.manifolds.flat_torus import FlatTorus
+from rieVAE.manifolds.sphere import Sphere
+from rieVAE.manifolds.hyperbolic import Hyperbolic
+from rieVAE.manifolds.stereographic_product import StereographicProduct
 
 
 _MANIFOLD_BY_NAME: dict[str, str] = {
